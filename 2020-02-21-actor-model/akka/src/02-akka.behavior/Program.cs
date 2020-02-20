@@ -8,7 +8,7 @@ namespace _02_akka.behavior
     public static class Program
     {
         private static readonly IDictionary<string, IActorRef> Orders = new Dictionary<string, IActorRef>();
-        private static readonly ActorSystem System = ActorSystem.Create("basic-system");
+        private static readonly ActorSystem System = ActorSystem.Create("behavior");
         
         public static async Task Main()
         {
