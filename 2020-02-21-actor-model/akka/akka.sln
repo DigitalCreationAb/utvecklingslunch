@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "02-akka.behavior", "src\02-
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "03-akka.children", "src\03-akka.children\03-akka.children.csproj", "{BCF72D75-666D-40CB-B222-98F8693A0372}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "04-akka.persistence", "src\04-akka.persistence\04-akka.persistence.csproj", "{3D68716A-CC4C-46E2-B326-427F708515B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,5 +65,17 @@ Global
 		{BCF72D75-666D-40CB-B222-98F8693A0372}.Release|x64.Build.0 = Release|Any CPU
 		{BCF72D75-666D-40CB-B222-98F8693A0372}.Release|x86.ActiveCfg = Release|Any CPU
 		{BCF72D75-666D-40CB-B222-98F8693A0372}.Release|x86.Build.0 = Release|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Debug|x64.Build.0 = Debug|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Debug|x86.Build.0 = Debug|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Release|x64.ActiveCfg = Release|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Release|x64.Build.0 = Release|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Release|x86.ActiveCfg = Release|Any CPU
+		{3D68716A-CC4C-46E2-B326-427F708515B5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
