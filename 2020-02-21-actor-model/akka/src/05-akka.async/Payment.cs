@@ -31,6 +31,11 @@ namespace _05_akka.async
 
                 public string PaymentId { get; }
                 public decimal Amount { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} charged with the amount {Amount:N2}";
+                }
             }
             
             public class PaymentChargeFailed
@@ -43,6 +48,11 @@ namespace _05_akka.async
 
                 public string PaymentId { get; }
                 public string Reason { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} failed charging. Reason: \"{Reason}\"";
+                }
             }
             
             public class PaymentRefunded
@@ -55,6 +65,11 @@ namespace _05_akka.async
 
                 public string PaymentId { get; }
                 public decimal Amount { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} refunded the amount {Amount}";
+                }
             }
             
             public class PaymentRefundFailed
@@ -67,6 +82,11 @@ namespace _05_akka.async
 
                 public string PaymentId { get; }
                 public string Reason { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} failed refunding. Reason: \"{Reason}\"";
+                }
             }
         }
 

@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Akka.Actor;
+using Akka.Persistence.EventStore.Query;
+using Akka.Persistence.Query;
+using Akka.Streams;
 
 namespace _05_akka.async
 {
     public static class Program
     {
-        private static readonly IDictionary<string, IActorRef> Orders = new Dictionary<string, IActorRef>();
-        private static readonly ActorSystem System = ActorSystem.Create("children");
-        
         public static async Task Main()
         {
             var commands = new Dictionary<string, Func<Task<NextStep>>>
@@ -21,6 +22,25 @@ namespace _05_akka.async
                 ["confirm-order"] = ConfirmOrder,
                 ["cancel-order"] = CancelOrder
             };
+
+            var system = ActorSystem.Create("async", File.ReadAllText("./akka.config"));
+
+            OrderCoordinator.Initialize(system);
+            
+            var queries = PersistenceQuery.Get(system).ReadJournalFor<EventStoreReadJournal>(EventStoreReadJournal.Identifier);
+            var materializer = ActorMaterializer.Create(system);
+            
+            var src = queries.PersistenceIds();
+
+            src.RunForeach(persistenceId =>
+            {
+                var idSource = queries.EventsByPersistenceId(persistenceId, 0, long.MaxValue);
+
+                idSource.RunForeach(evnt =>
+                {
+                    Console.WriteLine(evnt.Event.ToString());
+                }, materializer);
+            }, materializer);
             
             while (true)
             {
@@ -40,7 +60,7 @@ namespace _05_akka.async
             }
             
             await CoordinatedShutdown
-                .Get(System)
+                .Get(system)
                 .Run(CoordinatedShutdown.ClrExitReason.Instance);
         }
 
@@ -51,20 +71,14 @@ namespace _05_akka.async
 
         private static Task<NextStep> PlaceOrder()
         {
-            var orderId = (Orders.Count + 1).ToString();
-
-            var order = System.ActorOf<SalesOrder>(orderId);
-
-            Orders[orderId] = order;
-            
             Console.WriteLine("Enter a product name:");
             var productName = Console.ReadLine() ?? "";
             
             Console.WriteLine("Enter a product price:");
             var productPrice = decimal.Parse(Console.ReadLine() ?? "");
-
-            order.Tell(new SalesOrder.Commands.PlaceOrder(productName, productPrice));
             
+            OrderCoordinator.PlaceOrder(productName, productPrice);
+
             return Task.FromResult(NextStep.Continue);
         }
 
@@ -73,17 +87,9 @@ namespace _05_akka.async
             Console.WriteLine("What order do you want to see?");
             var orderId = Console.ReadLine() ?? "";
 
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
-
-                return NextStep.Continue;
-            }
-
-            var order = Orders[orderId];
-
-            var response =
-                await order.Ask<SalesOrder.Responses.OrderDataResponse>(new SalesOrder.Queries.GetOrderData());
+            var response = await OrderCoordinator.QueryOrder<SalesOrder.Responses.OrderDataResponse>(
+                orderId,
+                new SalesOrder.Queries.GetOrderData());
             
             Console.WriteLine($"Order: {orderId}, Product name: {response.ProductName}, Product price: {response.ProductPrice:N2}, Status: {response.Status}");
 
@@ -94,20 +100,11 @@ namespace _05_akka.async
         {
             Console.WriteLine("What order do you want to add a payment to?");
             var orderId = Console.ReadLine() ?? "";
-            
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
 
-                return Task.FromResult(NextStep.Continue);
-            }
-            
-            var order = Orders[orderId];
-            
             Console.WriteLine("How much do you want to pay?");
             var amount = decimal.Parse(Console.ReadLine() ?? "");
-
-            order.Tell(new SalesOrder.Commands.AddPayment(amount));
+            
+            OrderCoordinator.SendCommandToOrder(orderId, new SalesOrder.Commands.AddPayment(amount));
             
             return Task.FromResult(NextStep.Continue);
         }
@@ -117,17 +114,8 @@ namespace _05_akka.async
             Console.WriteLine("What order do you want to confirm?");
             var orderId = Console.ReadLine() ?? "";
             
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
+            OrderCoordinator.SendCommandToOrder(orderId, new SalesOrder.Commands.ConfirmOrder());
 
-                return Task.FromResult(NextStep.Continue);
-            }
-            
-            var order = Orders[orderId];
-
-            order.Tell(new SalesOrder.Commands.ConfirmOrder());
-            
             return Task.FromResult(NextStep.Continue);
         }
 
@@ -135,17 +123,8 @@ namespace _05_akka.async
         {
             Console.WriteLine("What order do you want to cancel?");
             var orderId = Console.ReadLine() ?? "";
-            
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
 
-                return Task.FromResult(NextStep.Continue);
-            }
-            
-            var order = Orders[orderId];
-
-            order.Tell(new SalesOrder.Commands.CancelOrder());
+            OrderCoordinator.SendCommandToOrder(orderId, new SalesOrder.Commands.CancelOrder());
 
             return Task.FromResult(NextStep.Continue);
         }

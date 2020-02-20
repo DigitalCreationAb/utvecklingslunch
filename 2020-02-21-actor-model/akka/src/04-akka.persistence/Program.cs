@@ -8,7 +8,7 @@ namespace _04_akka.persistence
     public static class Program
     {
         private static readonly IDictionary<string, IActorRef> Orders = new Dictionary<string, IActorRef>();
-        private static readonly ActorSystem System = ActorSystem.Create("children");
+        private static readonly ActorSystem System = ActorSystem.Create("persistence");
         
         public static async Task Main()
         {

@@ -1,0 +1,7 @@
+.DEFAULT_GOAL := run.eventstore
+.PHONY: run.eventstore
+
+run.eventstore:
+	if not exist .data mkdir .data
+	if not exist .data\EventStore (powershell -ExecutionPolicy Bypass -Command "& { iwr http://eventstore.org/downloads/win/EventStore-OSS-Win-v5.0.2.zip -OutFile %cd%\.data\eventstore.zip }" && 7z.exe x .data\eventstore.zip -o"%cd%\.data\EventStore" && del .data\eventstore.zip)
+	cd .data\EventStore && call EventStore.ClusterNode.exe --start-standard-projections=True --run-projections=All

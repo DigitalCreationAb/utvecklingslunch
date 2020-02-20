@@ -57,6 +57,12 @@ namespace _05_akka.async
                 public string OrderId { get; }
                 public string ProductName { get; }
                 public decimal ProductPrice { get; }
+
+                public override string ToString()
+                {
+                    return
+                        $"Order {OrderId} was placed. Product name: \"{ProductName}\", Product price: {ProductPrice:N2}";
+                }
             }
             
             public class PlaceOrderFailed
@@ -69,6 +75,11 @@ namespace _05_akka.async
 
                 public string OrderId { get; }
                 public string Reason { get; }
+
+                public override string ToString()
+                {
+                    return $"Failed placing order {OrderId}. Reason: \"{Reason}\"";
+                }
             }
             
             public class PaymentAddedToOrder
@@ -83,6 +94,11 @@ namespace _05_akka.async
                 public string OrderId { get; }
                 public string PaymentId { get; }
                 public decimal Amount { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} added to order {OrderId}. Amount: {Amount:N2}";
+                }
             }
             
             public class FailedAddingPaymentToOrder
@@ -97,6 +113,11 @@ namespace _05_akka.async
                 public string OrderId { get; }
                 public decimal Amount { get; }
                 public string Reason { get; }
+
+                public override string ToString()
+                {
+                    return $"Failed adding payment to order {OrderId}. Reason: \"{Reason}\"";
+                }
             }
             
             public class OrderPaymentCharged
@@ -109,6 +130,11 @@ namespace _05_akka.async
 
                 public string OrderId { get; }
                 public string PaymentId { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} for order {OrderId} was charged";
+                }
             }
             
             public class OrderPaymentRefunded
@@ -121,6 +147,11 @@ namespace _05_akka.async
 
                 public string OrderId { get; }
                 public string PaymentId { get; }
+
+                public override string ToString()
+                {
+                    return $"Payment {PaymentId} for order {OrderId} was refunded";
+                }
             }
             
             public class OrderCompleted
@@ -131,6 +162,11 @@ namespace _05_akka.async
                 }
 
                 public string OrderId { get; }
+
+                public override string ToString()
+                {
+                    return $"Order {OrderId} was completed";
+                }
             }
             
             public class OrderConfirmed
@@ -141,6 +177,11 @@ namespace _05_akka.async
                 }
 
                 public string OrderId { get; }
+
+                public override string ToString()
+                {
+                    return $"Order {OrderId} was confirmed";
+                }
             }
             
             public class ConfirmOrderFailed
@@ -153,6 +194,11 @@ namespace _05_akka.async
 
                 public string OrderId { get; }
                 public string Reason { get; }
+
+                public override string ToString()
+                {
+                    return $"Failed confirming order {OrderId}. Reason: \"{Reason}\"";
+                }
             }
             
             public class OrderCancelled
@@ -163,6 +209,11 @@ namespace _05_akka.async
                 }
 
                 public string OrderId { get; }
+
+                public override string ToString()
+                {
+                    return $"Order {OrderId} was cancelled";
+                }
             }
             
             public class OrderCancellationFailed
@@ -175,6 +226,11 @@ namespace _05_akka.async
 
                 public string OrderId { get; }
                 public string Reason { get; }
+
+                public override string ToString()
+                {
+                    return $"Failed cancelling order {OrderId}. Reason: \"{Reason}\"";
+                }
             }
         }
         
@@ -227,6 +283,11 @@ namespace _05_akka.async
             Recover<Events.OrderCancellationFailed>(On);
             
             Become(New);
+        }
+
+        public static Props Initialize()
+        {
+            return Props.Create<SalesOrder>();
         }
 
         private void New()
