@@ -289,6 +289,9 @@ namespace _04_akka.persistence
                 {
                     On(paymentAdded);
                     
+                    if (IsComplete())
+                        Persist(new Events.OrderCompleted(OrderId), On);
+                    
                     Sender.Tell(new Responses.AddPaymentResponse(paymentId));
                 });
             });
