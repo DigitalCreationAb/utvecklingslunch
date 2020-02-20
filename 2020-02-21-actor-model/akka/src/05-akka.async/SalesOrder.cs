@@ -1,11 +1,10 @@
+using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
-using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Persistence;
 
-namespace _04_akka.persistence
+namespace _05_akka.async
 {
     public class SalesOrder : ReceivePersistentActor
     {
@@ -60,6 +59,18 @@ namespace _04_akka.persistence
                 public decimal ProductPrice { get; }
             }
             
+            public class PlaceOrderFailed
+            {
+                public PlaceOrderFailed(string orderId, string reason)
+                {
+                    OrderId = orderId;
+                    Reason = reason;
+                }
+
+                public string OrderId { get; }
+                public string Reason { get; }
+            }
+            
             public class PaymentAddedToOrder
             {
                 public PaymentAddedToOrder(string orderId, string paymentId, decimal amount)
@@ -72,6 +83,20 @@ namespace _04_akka.persistence
                 public string OrderId { get; }
                 public string PaymentId { get; }
                 public decimal Amount { get; }
+            }
+            
+            public class FailedAddingPaymentToOrder
+            {
+                public FailedAddingPaymentToOrder(string orderId, decimal amount, string reason)
+                {
+                    OrderId = orderId;
+                    Amount = amount;
+                    Reason = reason;
+                }
+
+                public string OrderId { get; }
+                public decimal Amount { get; }
+                public string Reason { get; }
             }
             
             public class OrderPaymentCharged
@@ -118,6 +143,18 @@ namespace _04_akka.persistence
                 public string OrderId { get; }
             }
             
+            public class ConfirmOrderFailed
+            {
+                public ConfirmOrderFailed(string orderId, string reason)
+                {
+                    OrderId = orderId;
+                    Reason = reason;
+                }
+
+                public string OrderId { get; }
+                public string Reason { get; }
+            }
+            
             public class OrderCancelled
             {
                 public OrderCancelled(string orderId)
@@ -126,6 +163,18 @@ namespace _04_akka.persistence
                 }
 
                 public string OrderId { get; }
+            }
+            
+            public class OrderCancellationFailed
+            {
+                public OrderCancellationFailed(string orderId, string reason)
+                {
+                    OrderId = orderId;
+                    Reason = reason;
+                }
+
+                public string OrderId { get; }
+                public string Reason { get; }
             }
         }
         
@@ -139,18 +188,6 @@ namespace _04_akka.persistence
         
         public static class Responses
         {
-            public class PlaceOrderResponse
-            {
-                public PlaceOrderResponse(params string[] errors)
-                {
-                    Errors = errors.ToImmutableList();
-                }
-                
-                public IImmutableList<string> Errors { get; }
-
-                public bool Success => !Errors.Any();
-            }
-            
             public class OrderDataResponse
             {
                 public OrderDataResponse(string productName, decimal productPrice, string status)
@@ -163,43 +200,6 @@ namespace _04_akka.persistence
                 public string ProductName { get; }
                 public decimal ProductPrice { get; }
                 public string Status { get; }
-            }
-            
-            public class AddPaymentResponse
-            {
-                public AddPaymentResponse(string paymentId, string errorMessage = null)
-                {
-                    PaymentId = paymentId;
-                    ErrorMessage = errorMessage;
-                }
-
-                public string PaymentId { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
-            }
-            
-            public class ConfirmOrderResponse
-            {
-                public ConfirmOrderResponse(params string[] errors)
-                {
-                    Errors = errors.ToImmutableList();
-                }
-                
-                public IImmutableList<string> Errors { get; }
-
-                public bool Success => !Errors.Any();
-            }
-            
-            public class CancelOrderResponse
-            {
-                public CancelOrderResponse(params string[] errors)
-                {
-                    Errors = errors.ToImmutableList();
-                }
-                
-                public IImmutableList<string> Errors { get; }
-
-                public bool Success => !Errors.Any();
             }
         }
 
@@ -215,26 +215,27 @@ namespace _04_akka.persistence
         public SalesOrder()
         {
             Recover<Events.OrderPlaced>(On);
+            Recover<Events.PlaceOrderFailed>(On);
             Recover<Events.PaymentAddedToOrder>(On);
+            Recover<Events.FailedAddingPaymentToOrder>(On);
             Recover<Events.OrderPaymentCharged>(On);
             Recover<Events.OrderPaymentRefunded>(On);
             Recover<Events.OrderCompleted>(On);
             Recover<Events.OrderConfirmed>(On);
+            Recover<Events.ConfirmOrderFailed>(On);
             Recover<Events.OrderCancelled>(On);
+            Recover<Events.OrderCancellationFailed>(On);
             
             Become(New);
         }
 
         private void New()
         {
+            PaymentEvents();
+            
             Command<Commands.PlaceOrder>(cmd =>
             {
-                Persist(new Events.OrderPlaced(OrderId, cmd.ProductName, cmd.ProductPrice), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.PlaceOrderResponse());
-                });
+                Persist(new Events.OrderPlaced(OrderId, cmd.ProductName, cmd.ProductPrice), On);
             });
 
             Command<Queries.GetOrderData>(query =>
@@ -244,25 +245,27 @@ namespace _04_akka.persistence
             
             Command<Commands.AddPayment>(cmd =>
             {
-                Sender.Tell(new Responses.AddPaymentResponse("", "You can't add a payment to a order that hasn't been placed yet"));
+                Persist(new Events.FailedAddingPaymentToOrder(OrderId, cmd.Amount, "This order hasn't been placed yet"), On);
             });
             
             Command<Commands.ConfirmOrder>(cmd =>
             {
-                Sender.Tell(new Responses.ConfirmOrderResponse("This order hasn't been completed"));
+                Persist(new Events.ConfirmOrderFailed(OrderId, "This order hasn't been completed"), On);
             });
-            
+
             Command<Commands.CancelOrder>(cmd =>
             {
-                Sender.Tell(new Responses.CancelOrderResponse("This order hasn't been completed yet"));
+                Persist(new Events.OrderCancellationFailed(OrderId, "This order hasn't been completed yet"), On);
             });
         }
 
         private void Placed()
         {
+            PaymentEvents();
+            
             Command<Commands.PlaceOrder>(cmd =>
             {
-                Sender.Tell(new Responses.PlaceOrderResponse("This order has already been placed"));
+                Persist(new Events.PlaceOrderFailed(OrderId, "This order has already been placed"), On);
             });
             
             Command<Queries.GetOrderData>(query =>
@@ -276,8 +279,11 @@ namespace _04_akka.persistence
 
                 if (cmd.Amount > amountLeftToPay)
                 {
-                    Sender.Tell(new Responses.AddPaymentResponse("", $"The amount {cmd.Amount:N2} is higher then what left to pay for this order ({amountLeftToPay})"));
-                    
+                    Persist(
+                        new Events.FailedAddingPaymentToOrder(OrderId, cmd.Amount,
+                            $"The amount {cmd.Amount:N2} is higher then what left to pay for this order ({amountLeftToPay})"),
+                        On);
+
                     return;
                 }
                 
@@ -285,93 +291,61 @@ namespace _04_akka.persistence
 
                 var paymentId = $"{OrderId}-{paymentIncrement}";
                 
-                Persist(new Events.PaymentAddedToOrder(OrderId, paymentId, cmd.Amount), paymentAdded =>
-                {
-                    On(paymentAdded);
-                    
-                    Sender.Tell(new Responses.AddPaymentResponse(paymentId));
-                });
+                Persist(new Events.PaymentAddedToOrder(OrderId, paymentId, cmd.Amount), On);
             });
             
             Command<Commands.ConfirmOrder>(cmd =>
             {
-                Sender.Tell(new Responses.ConfirmOrderResponse("This order hasn't been completed"));
+                Persist(new Events.ConfirmOrderFailed(OrderId, "This order hasn't been completed"), On);
             });
-            
+
             Command<Commands.CancelOrder>(cmd =>
             {
-                Sender.Tell(new Responses.CancelOrderResponse("This order hasn't been completed yet"));
+                Persist(new Events.OrderCancellationFailed(OrderId, "This order hasn't been completed yet"), On);
             });
         }
 
         private void Complete()
         {
+            PaymentEvents();
+            
             Command<Commands.PlaceOrder>(cmd =>
             {
-                Sender.Tell(new Responses.PlaceOrderResponse("This order has already been placed"));
+                Persist(new Events.PlaceOrderFailed(OrderId, "This order has already been placed"), On);
             });
             
             Command<Queries.GetOrderData>(query =>
             {
                 Sender.Tell(new Responses.OrderDataResponse(_productName, _productPrice, "Complete"));
             });
-            
+
             Command<Commands.AddPayment>(cmd =>
             {
-                Sender.Tell(new Responses.AddPaymentResponse("", "You have already added enough payments to this order"));
+                Persist(
+                    new Events.FailedAddingPaymentToOrder(OrderId, cmd.Amount,
+                        "You have already added enough payments to this order"), On);
             });
             
-            CommandAsync<Commands.ConfirmOrder>(async cmd =>
+            Command<Commands.ConfirmOrder>(cmd =>
             {
                 var paymentsToCharge = _payments
                     .Where(x => x.Value.Status == PaymentInformation.PaymentStatus.Initialized)
                     .ToList();
-                
-                var errors = new List<string>();
-                var chargedPayments = new List<string>();
 
                 foreach (var payment in paymentsToCharge)
-                {
-                    var response = await payment.Value.Charge();
-
-                    if (!response.Success)
-                        errors.Add(response.ErrorMessage);
-                    else
-                        chargedPayments.Add(payment.Key);
-                }
-
-                if (!chargedPayments.Any())
-                {
-                    Sender.Tell(new Responses.ConfirmOrderResponse(errors.ToArray()));
-                    
-                    return;
-                }
-                
-                PersistAll(chargedPayments
-                    .Select(paymentId => new Events.OrderPaymentCharged(OrderId, paymentId)), paymentCharged =>
-                {
-                    On(paymentCharged);
-                   
-                    if (IsFullyCharged())
-                    {
-                        Persist(new Events.OrderConfirmed(OrderId), orderConfirmed =>
-                        {
-                            On(orderConfirmed);
-                        });
-                    }
-                });
-                
-                Sender.Tell(new Responses.ConfirmOrderResponse());
+                    payment.Value.Charge();
             });
             
-            CommandAsync<Commands.CancelOrder>(cmd => CancelOrder());
+            Command<Commands.CancelOrder>(cmd => CancelOrder());
         }
         
         private void Confirmed()
         {
+            PaymentEvents();
+            
             Command<Commands.PlaceOrder>(cmd =>
             {
-                Sender.Tell(new Responses.PlaceOrderResponse("This order has already been placed"));
+                Persist(new Events.PlaceOrderFailed(OrderId, "This order has already been placed"), On);
             });
             
             Command<Queries.GetOrderData>(query =>
@@ -381,22 +355,26 @@ namespace _04_akka.persistence
             
             Command<Commands.AddPayment>(cmd =>
             {
-                Sender.Tell(new Responses.AddPaymentResponse("", "You have already added enough payments to this order"));
+                Persist(
+                    new Events.FailedAddingPaymentToOrder(OrderId, cmd.Amount,
+                        "You have already added enough payments to this order"), On);
             });
             
             Command<Commands.ConfirmOrder>(cmd =>
             {
-                Sender.Tell(new Responses.ConfirmOrderResponse("This order has already been confirmed"));
+                Persist(new Events.ConfirmOrderFailed(OrderId, "This order has already been confirmed"), On);
             });
             
-            CommandAsync<Commands.CancelOrder>(cmd => CancelOrder());
+            Command<Commands.CancelOrder>(cmd => CancelOrder());
         }
 
         private void Cancelled()
         {
+            PaymentEvents();
+            
             Command<Commands.PlaceOrder>(cmd =>
             {
-                Sender.Tell(new Responses.PlaceOrderResponse("This order has been cancelled"));
+                Persist(new Events.PlaceOrderFailed(OrderId, "This order has been cancelled"), On);
             });
             
             Command<Queries.GetOrderData>(query =>
@@ -406,17 +384,44 @@ namespace _04_akka.persistence
             
             Command<Commands.AddPayment>(cmd =>
             {
-                Sender.Tell(new Responses.AddPaymentResponse("", "This order has been cancelled"));
+                Persist(
+                    new Events.FailedAddingPaymentToOrder(OrderId, cmd.Amount,
+                        "This order has been cancelled"), On);
             });
             
             Command<Commands.ConfirmOrder>(cmd =>
             {
-                Sender.Tell(new Responses.ConfirmOrderResponse("This order has been cancelled"));
+                Persist(new Events.ConfirmOrderFailed(OrderId, "This order has been cancelled"), On);
             });
             
             Command<Commands.CancelOrder>(cmd =>
             {
-                Sender.Tell(new Responses.CancelOrderResponse("This order has already been cancelled"));
+                Persist(new Events.OrderCancellationFailed(OrderId, "This order has already been cancelled"), On);
+            });
+        }
+
+        private void PaymentEvents()
+        {
+            ChildEvent<Payment.Events.PaymentCharged>(evnt =>
+            {
+                Persist(new Events.OrderPaymentCharged(OrderId, evnt.PaymentId), paymentCharged =>
+                {
+                    On(paymentCharged);
+                    
+                    if (IsFullyCharged())
+                        Persist(new Events.OrderConfirmed(OrderId), On);
+                });
+            });
+            
+            ChildEvent<Payment.Events.PaymentRefunded>(evnt =>
+            {
+                Persist(new Events.OrderPaymentRefunded(OrderId, evnt.PaymentId), paymentRefunded =>
+                {
+                    On(paymentRefunded);
+
+                    if (IsFullyRefunded())
+                        Persist(new Events.OrderCancelled(OrderId), On);
+                });
             });
         }
 
@@ -428,9 +433,22 @@ namespace _04_akka.persistence
             Become(Placed);
         }
 
+        private void On(Events.PlaceOrderFailed evnt)
+        {
+            
+        }
+
         private void On(Events.PaymentAddedToOrder evnt)
         {
             _payments[evnt.PaymentId] = new PaymentInformation(evnt.PaymentId, evnt.Amount);
+            
+            if (IsComplete())
+                Become(Complete);
+        }
+
+        private void On(Events.FailedAddingPaymentToOrder evnt)
+        {
+            
         }
         
         private void On(Events.OrderPaymentCharged evnt)
@@ -455,52 +473,34 @@ namespace _04_akka.persistence
             Become(Confirmed);
         }
 
+        private void On(Events.ConfirmOrderFailed evnt)
+        {
+            
+        }
+
         private void On(Events.OrderCancelled evnt)
         {
             Become(Cancelled);
         }
 
-        private async Task CancelOrder()
+        private void On(Events.OrderCancellationFailed evnt)
+        {
+            
+        }
+
+        private void ChildEvent<TEvent>(Action<TEvent> handler)
+        {
+            Command(handler);
+        }
+
+        private void CancelOrder()
         {
             var paymentsToRefund = _payments
                 .Where(x => x.Value.Status != PaymentInformation.PaymentStatus.Refunded)
                 .ToList();
-
-            var errors = new List<string>();
-            var refundedPayments = new List<string>();
-
-            foreach (var payment in paymentsToRefund)
-            {
-                var response = await payment.Value.Refund();
-                    
-                if (!response.Success)
-                    errors.Add(response.ErrorMessage);
-                else
-                    refundedPayments.Add(payment.Key);
-            }
-
-            if (!refundedPayments.Any())
-            {
-                Sender.Tell(new Responses.CancelOrderResponse(errors.ToArray()));
-                    
-                return;
-            }
             
-            PersistAll(refundedPayments
-                .Select(paymentId => new Events.OrderPaymentRefunded(OrderId, paymentId)), paymentRefunded =>
-            {
-                On(paymentRefunded);
-                
-                if (IsFullyRefunded())
-                {
-                    Persist(new Events.OrderCancelled(OrderId), orderCancelled =>
-                    {
-                        On(orderCancelled);
-                        
-                        Sender.Tell(new Responses.CancelOrderResponse());
-                    });
-                }
-            });
+            foreach (var payment in paymentsToRefund)
+                payment.Value.Refund();
         }
 
         private decimal CalculateAmountLeftToPay()
@@ -547,14 +547,14 @@ namespace _04_akka.persistence
             public decimal Amount { get; }
             public PaymentStatus Status { get; private set; }
             
-            public Task<Payment.Responses.ChargePaymentResponse> Charge()
+            public void Charge()
             {
-                return _payment.Ask<Payment.Responses.ChargePaymentResponse>(new Payment.Commands.ChargePayment());
+                _payment.Tell(new Payment.Commands.ChargePayment());
             }
 
-            public Task<Payment.Responses.RefundPaymentResponse> Refund()
+            public void Refund()
             {
-                return _payment.Ask<Payment.Responses.RefundPaymentResponse>(new Payment.Commands.RefundPayment());
+                _payment.Tell(new Payment.Commands.RefundPayment());
             }
 
             public void UpdateStatus(PaymentStatus status)

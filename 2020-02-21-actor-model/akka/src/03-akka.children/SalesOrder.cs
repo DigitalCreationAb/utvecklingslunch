@@ -81,7 +81,7 @@ namespace _03_akka.children
             
             public class AddPaymentResponse
             {
-                public AddPaymentResponse(string paymentId, string errorMessage)
+                public AddPaymentResponse(string paymentId, string errorMessage = null)
                 {
                     PaymentId = paymentId;
                     ErrorMessage = errorMessage;
@@ -173,7 +173,7 @@ namespace _03_akka.children
                 Sender.Tell(new Responses.OrderDataResponse(_productName, _productPrice, "Placed"));
             });
             
-            ReceiveAsync<Commands.AddPayment>(async cmd =>
+            Receive<Commands.AddPayment>(cmd =>
             {
                 var amountLeftToPay = CalculateAmountLeftToPay();
 
@@ -187,13 +187,11 @@ namespace _03_akka.children
                 var paymentId = (_payments.Count + 1).ToString();
 
                 _payments[paymentId] = new PaymentInformation(paymentId, cmd.Amount);
-
-                var response = await _payments[paymentId].Initialize();
                 
                 if (IsComplete())
                     Become(Complete);
                 
-                Sender.Tell(new Responses.AddPaymentResponse(paymentId, response.ErrorMessage));
+                Sender.Tell(new Responses.AddPaymentResponse(paymentId));
             });
             
             Receive<Commands.ConfirmOrder>(cmd =>
@@ -374,25 +372,13 @@ namespace _03_akka.children
             public PaymentInformation(string id, decimal amount)
             {
                 Amount = amount;
-                _payment = Context.ActorOf<Payment>(id);
-                Status = PaymentStatus.New;
+                _payment = Context.ActorOf(Payment.Initialize(amount), id);
+                Status = PaymentStatus.Initialized;
             }
 
             public decimal Amount { get; }
             public PaymentStatus Status { get; private set;}
-
-            public async Task<Payment.Responses.InitializePaymentResponse> Initialize()
-            {
-                var response =
-                    await _payment.Ask<Payment.Responses.InitializePaymentResponse>(
-                        new Payment.Commands.InitializePayment(Amount));
-
-                if (response.Success)
-                    Status = PaymentStatus.Initialized;
-
-                return response;
-            }
-
+            
             public async Task<Payment.Responses.ChargePaymentResponse> Charge()
             {
                 var response =
@@ -417,7 +403,6 @@ namespace _03_akka.children
             
             public enum PaymentStatus
             {
-                New,
                 Initialized,
                 Charged,
                 Refunded

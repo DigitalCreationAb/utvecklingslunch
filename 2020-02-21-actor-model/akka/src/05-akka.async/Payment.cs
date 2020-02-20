@@ -1,7 +1,8 @@
+using System;
 using Akka.Actor;
 using Akka.Persistence;
 
-namespace _04_akka.persistence
+namespace _05_akka.async
 {
     public class Payment : ReceivePersistentActor
     {
@@ -32,6 +33,18 @@ namespace _04_akka.persistence
                 public decimal Amount { get; }
             }
             
+            public class PaymentChargeFailed
+            {
+                public PaymentChargeFailed(string paymentId, string reason)
+                {
+                    PaymentId = paymentId;
+                    Reason = reason;
+                }
+
+                public string PaymentId { get; }
+                public string Reason { get; }
+            }
+            
             public class PaymentRefunded
             {
                 public PaymentRefunded(string paymentId, decimal amount)
@@ -43,34 +56,17 @@ namespace _04_akka.persistence
                 public string PaymentId { get; }
                 public decimal Amount { get; }
             }
-        }
-        
-        public static class Responses
-        {
-            public class ChargePaymentResponse
-            {
-                public ChargePaymentResponse(decimal amount, string errorMessage = "")
-                {
-                    Amount = amount;
-                    ErrorMessage = errorMessage;
-                }
-
-                public decimal Amount { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
-            }
             
-            public class RefundPaymentResponse
+            public class PaymentRefundFailed
             {
-                public RefundPaymentResponse(decimal amount, string errorMessage = "")
+                public PaymentRefundFailed(string paymentId, string reason)
                 {
-                    Amount = amount;
-                    ErrorMessage = errorMessage;
+                    PaymentId = paymentId;
+                    Reason = reason;
                 }
 
-                public decimal Amount { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
+                public string PaymentId { get; }
+                public string Reason { get; }
             }
         }
 
@@ -85,31 +81,23 @@ namespace _04_akka.persistence
             _amount = amount;
             
             Recover<Events.PaymentCharged>(On);
+            Recover<Events.PaymentChargeFailed>(On);
             Recover<Events.PaymentRefunded>(On);
+            Recover<Events.PaymentRefundFailed>(On);
             
             Become(Initialized);
         }
-
+        
         private void Initialized()
         {
             Command<Commands.ChargePayment>(cmd =>
             {
-                Persist(new Events.PaymentCharged(PaymentId, _amount), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.ChargePaymentResponse(_amount));
-                });
+                PersistAndNotifyParent(new Events.PaymentCharged(PaymentId, _amount), On);
             });
             
             Command<Commands.RefundPayment>(cmd =>
             {
-                Persist(new Events.PaymentRefunded(PaymentId, _amount), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.RefundPaymentResponse(_amount));
-                });
+                PersistAndNotifyParent(new Events.PaymentRefunded(PaymentId, _amount), On);
             });
         }
 
@@ -117,17 +105,13 @@ namespace _04_akka.persistence
         {
             Command<Commands.ChargePayment>(cmd =>
             {
-                Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has already been charged"));
+                PersistAndNotifyParent(
+                    new Events.PaymentChargeFailed(PaymentId, "This payment has already been charged"), On);
             });
             
             Command<Commands.RefundPayment>(cmd =>
             {
-                Persist(new Events.PaymentRefunded(PaymentId, _amount), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.RefundPaymentResponse(_amount));
-                });
+                PersistAndNotifyParent(new Events.PaymentRefunded(PaymentId, _amount), On);
             });
         }
 
@@ -135,25 +119,47 @@ namespace _04_akka.persistence
         {
             Command<Commands.ChargePayment>(cmd =>
             {
-                Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has been refunded"));
+                PersistAndNotifyParent(
+                    new Events.PaymentChargeFailed(PaymentId, "This payment has been refunded"), On);
             });
             
             Command<Commands.RefundPayment>(cmd =>
             {
-                Sender.Tell(new Responses.RefundPaymentResponse(0, "This payment has already been refunded"));
+                PersistAndNotifyParent(
+                    new Events.PaymentRefundFailed(PaymentId, "This payment has already been refunded"), On);
             });
         }
-        
+
+        private void PersistAndNotifyParent<TEvent>(TEvent evnt, Action<TEvent> handler)
+        {
+            Persist(evnt, savedEvent =>
+            {
+                handler(savedEvent);
+                
+                Context.Parent.Tell(evnt);
+            });
+        }
+
         private void On(Events.PaymentCharged evnt)
         {
             Become(Charged);
         }
 
+        private void On(Events.PaymentChargeFailed evnt)
+        {
+            
+        }
+        
         private void On(Events.PaymentRefunded evnt)
         {
             Become(Refunded);
         }
-        
+
+        private void On(Events.PaymentRefundFailed evnt)
+        {
+            
+        }
+
         public static Props Initialize(decimal amount)
         {
             return Props.Create(() => new Payment(amount));
