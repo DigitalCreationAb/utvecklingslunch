@@ -1,0 +1,5 @@
+*.user
+.idea/
+obj
+bin
+packages/
