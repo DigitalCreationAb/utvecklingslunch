@@ -411,7 +411,15 @@ namespace _06_akka.safe_process
                 });
             });
 
-            Command<Commands.StartCancellationProcess>(cmd => CancelOrder());
+            Command<Commands.StartCancellationProcess>(cmd =>
+            {
+                Persist(new Events.OrderCancelled(OrderId), orderCancelled =>
+                {
+                    On(orderCancelled);
+                                
+                    Context.Parent.Tell(new Responses.CancellationProcessDoneResponse(OrderId));
+                });
+            });
         }
 
         private void Complete()
@@ -429,7 +437,11 @@ namespace _06_akka.safe_process
                     payment.Value.Charge();
             });
             
-            Command<Commands.StartCancellationProcess>(cmd => CancelOrder());
+            Command<Commands.StartCancellationProcess>(cmd =>
+            {
+                foreach (var payment in _payments)
+                    payment.Value.Refund();
+            });
         }
         
         private void Finished()
@@ -609,12 +621,6 @@ namespace _06_akka.safe_process
             Become(OrderFailed);
         }
         
-        private void CancelOrder()
-        {
-            foreach (var payment in _payments)
-                payment.Value.Refund();
-        }
-
         private decimal CalculateAmountLeftToPay()
         {
             return _productPrice - _payments.Sum(x => x.Value.Amount);
