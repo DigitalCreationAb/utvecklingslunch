@@ -40,20 +40,29 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call({:deposit, %{:amount => amount}}, %{
           :id => id,
           :state => %{:balance => current_balance}
-        }) do
+        })
+        when amount > 0 do
       {[{:money_deposited_to_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}],
        %{id: id, balance: current_balance + amount}}
+    end
+
+    def execute_call({:deposit, %{:amount => amount}}, _context) do
+      {:error, "Can't deposit negative amount"}
     end
 
     def execute_call({:withdraw, %{:amount => amount}}, %{
           :id => id,
           :state => %{:balance => current_balance}
         })
-        when current_balance >= amount do
+        when current_balance >= amount and amount > 0 do
       {[
          {:money_withdrawn_from_account,
           %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}
        ], %{id: id, balance: current_balance - amount}}
+    end
+
+    def execute_call({:withdraw, %{:amount => amount}}, _context) when amount <= 0 do
+      {:error, "Can't withdraw negative amount"}
     end
 
     def execute_call({:withdraw, _cmd}, _context) do
