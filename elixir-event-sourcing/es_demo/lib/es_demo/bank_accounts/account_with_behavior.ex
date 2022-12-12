@@ -27,9 +27,10 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call({:open, %{:customer => customer}}, %{
           :id => id
         }) do
-      {[{:account_opened, %{id: id, customer: customer}}], %{id: id, customer: customer, time_stamp: DateTime.utc_now()}}
+      {[{:account_opened, %{id: id, customer: customer}}],
+       %{id: id, customer: customer, time_stamp: DateTime.utc_now()}}
     end
-    
+
     def execute_call(_command, _state) do
       {:error, "This account doesn't exist"}
     end
@@ -50,8 +51,10 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
         }) do
       case current_balance do
         balance when balance >= amount ->
-          {[{:money_withdrawn_from_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}],
-           %{id: id, balance: current_balance - amount}}
+          {[
+             {:money_withdrawn_from_account,
+              %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}
+           ], %{id: id, balance: current_balance - amount}}
 
         _ ->
           {:error, "Not enough money in account"}
