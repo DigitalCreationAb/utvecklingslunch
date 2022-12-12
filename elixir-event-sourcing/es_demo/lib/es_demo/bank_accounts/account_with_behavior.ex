@@ -117,25 +117,23 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
   end
 
   defmodule Suspended do
-    def execute_call({:deposit, %{:amount => amount}}, %{
-          :id => id
-        }) do
+    def execute_call(:restore, %{:id => id}) do
+      {[{:account_restored, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
+    end
+    
+    def execute_call({:deposit, %{:amount => amount}}, _state) do
       {:error, "Can't deposit money into a suspended account"}
     end
 
-    def execute_call({:withdraw, %{:amount => amount}}, %{
-          :id => id
-        }) do
+    def execute_call({:withdraw, %{:amount => amount}}, _state) do
       {:error, "Can't withdraw money from a suspended account"}
     end
 
-    def execute_call(:close, %{
-          :id => id
-        }) do
+    def execute_call(:close, _state) do
       {:error, "Can't close a suspended account"}
     end
 
-    def execute_call(:suspend, %{:id => id}) do
+    def execute_call(:suspend, _state) do
       {:error, "This account is already suspended"}
     end
 
@@ -162,5 +160,9 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
 
   defp on(state, {:account_suspended, %{}}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Suspended}
+  end
+  
+  defp on(state, {:account_restored, %{}}) do
+    {state, EsDemo.BankAccounts.AccountWithBehavior.Opened}
   end
 end
