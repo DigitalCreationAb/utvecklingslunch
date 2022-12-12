@@ -5,12 +5,9 @@ defmodule EsDemo.Application do
 
   def start(_type, _args) do
     children = [
-      EsDemo.BankAccounts.Supervisor
+      EsDemo.BankAccounts.Supervisor,
+      {Reactive.Persistence.InMemoryEventStore, name: Reactive.Persistence.InMemoryEventStore}
     ]
-
-    Reactive.Persistence.InMemoryEventStore.start_link([],
-      name: Reactive.Persistence.InMemoryEventStore
-    )
 
     opts = [strategy: :one_for_one, name: EsDemo.Supervisor]
     Supervisor.start_link(children, opts)

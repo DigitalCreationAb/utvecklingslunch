@@ -7,7 +7,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
     %{
       id: id,
       start: {__MODULE__, :start_link, [data]},
-      type: :worker
+      restart: :transient
     }
   end
 
@@ -115,7 +115,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
         {:error, "This account is already suspended"}
     end
   end
-  
+
   def execute_call(:restore, %{:id => id, :state => %{:suspended => suspended}}) do
     case suspended do
       true -> {[{:account_restored, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
@@ -146,7 +146,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
   defp on(state, {:account_suspended, %{}}) do
     Map.put(state, :suspended, true)
   end
-  
+
   defp on(state, {:account_restored, %{}}) do
     Map.put(state, :suspended, false)
   end

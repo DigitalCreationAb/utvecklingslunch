@@ -1,4 +1,4 @@
-defmodule EsDemoEventBus do
+defmodule EsDemo.EventBus do
   @moduledoc false
 
   @behaviour Reactive.Persistence.EventBus

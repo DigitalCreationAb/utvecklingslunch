@@ -16,7 +16,7 @@ defmodule EsDemo.BankAccounts.Supervisor do
   end
 
   def get_entity(type, id) do
-    case DynamicSupervisor.start_child(__MODULE__, {type, %{id: id, event_bus: EsDemoEventBus}}) do
+    case DynamicSupervisor.start_child(__MODULE__, {type, %{id: id, event_bus: EsDemo.EventBus}}) do
       {:ok, pid} -> pid
       {:error, {:already_started, pid}} -> pid
     end

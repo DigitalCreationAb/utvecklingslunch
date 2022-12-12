@@ -7,7 +7,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     %{
       id: id,
       start: {__MODULE__, :start_link, [data]},
-      type: :worker
+      restart: :transient
     }
   end
 
@@ -27,8 +27,8 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call({:open, %{:customer => customer}}, %{
           :id => id
         }) do
-      {[{:account_opened, %{id: id, customer: customer}}],
-       %{id: id, customer: customer, time_stamp: DateTime.utc_now()}}
+      {[{:account_opened, %{id: id, customer: customer, time_stamp: DateTime.utc_now()}}],
+       %{id: id, customer: customer}}
     end
 
     def execute_call(_command, _state) do
@@ -48,66 +48,78 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call({:withdraw, %{:amount => amount}}, %{
           :id => id,
           :state => %{:balance => current_balance}
-        }) do
-      case current_balance do
-        balance when balance >= amount ->
-          {[
-             {:money_withdrawn_from_account,
-              %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}
-           ], %{id: id, balance: current_balance - amount}}
+        })
+        when current_balance >= amount do
+      {[
+         {:money_withdrawn_from_account,
+          %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}
+       ], %{id: id, balance: current_balance - amount}}
+    end
 
-        _ ->
-          {:error, "Not enough money in account"}
-      end
+    def execute_call({:withdraw, _cmd}, _context) do
+      {:error, "Not enough money in account"}
     end
 
     def execute_call(:close, %{
           :id => id,
           :state => %{:balance => current_balance}
-        }) do
-      case current_balance do
-        0 ->
-          {[{:account_closed, %{id: id}}], %{id: id, time_stamp: DateTime.utc_now()}}
+        })
+        when current_balance == 0 do
+      {[{:account_closed, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
+    end
 
-        balance when balance > 0 ->
-          {:error, "Can't close account with money left"}
+    def execute_call(:close, %{
+          :state => %{:balance => current_balance}
+        })
+        when current_balance > 0 do
+      {:error, "Can't close account with money left"}
+    end
 
-        balance when balance < 0 ->
-          {:error, "Can't close account with outstanding dept"}
-      end
+    def execute_call(:close, %{
+          :state => %{:balance => current_balance}
+        })
+        when current_balance < 0 do
+      {:error, "Can't close account with outstanding dept"}
     end
 
     def execute_call(:suspend, %{
           :id => id
         }) do
-      {[{:account_suspended, %{id: id}}], %{id: id, time_stamp: DateTime.utc_now()}}
+      {[{:account_suspended, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
     end
 
     def execute_call(:get_balance, %{:id => id, :state => %{:balance => current_balance}}) do
       %{id: id, balance: current_balance}
     end
+
+    def execute_cast({:withdraw, %{:amount => amount}}, %{
+          :id => id,
+          :state => %{:balance => current_balance}
+        })
+        when current_balance >= amount do
+      [
+        {:money_withdrawn_from_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}
+      ]
+    end
+
+    def execute_cast({:withdraw, _cmd}, _context) do
+    end
   end
 
   defmodule Closed do
-    def execute_call({:deposit, %{:amount => amount}}, %{
-          :id => id
-        }) do
+    def execute_call({:deposit, %{}}, _context) do
       {:error, "Can't deposit money to a closed account"}
     end
 
-    def execute_call({:withdraw, %{:amount => amount}}, %{
-          :id => id
-        }) do
+    def execute_call({:withdraw, %{}}, _context) do
       {:error, "Can't withdraw money from a closed account"}
     end
 
-    def execute_call(:close, %{
-          :id => id
-        }) do
+    def execute_call(:close, _context) do
       {:error, "This account is already closed"}
     end
 
-    def execute_call(:suspend, %{:id => id}) do
+    def execute_call(:suspend, %{}) do
       {:error, "Can't suspend a closed account"}
     end
 
@@ -120,12 +132,12 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call(:restore, %{:id => id}) do
       {[{:account_restored, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
     end
-    
-    def execute_call({:deposit, %{:amount => amount}}, _state) do
+
+    def execute_call({:deposit, %{}}, _state) do
       {:error, "Can't deposit money into a suspended account"}
     end
 
-    def execute_call({:withdraw, %{:amount => amount}}, _state) do
+    def execute_call({:withdraw, %{}}, _state) do
       {:error, "Can't withdraw money from a suspended account"}
     end
 
@@ -154,15 +166,19 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     Map.update(state, :balance, amount, fn current_balance -> current_balance - amount end)
   end
 
-  defp on(state, {:account_closed, %{}}) do
+  defp on(state, {:account_closed, _data}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Closed}
   end
 
-  defp on(state, {:account_suspended, %{}}) do
+  defp on(state, {:account_suspended, _data}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Suspended}
   end
-  
-  defp on(state, {:account_restored, %{}}) do
+
+  defp on(state, {:account_restored, _data}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Opened}
+  end
+
+  defp get_lifespan({:account_closed, _data}, _state) do
+    :stop
   end
 end
