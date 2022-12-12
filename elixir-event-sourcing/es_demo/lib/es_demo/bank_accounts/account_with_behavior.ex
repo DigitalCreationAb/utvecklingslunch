@@ -27,7 +27,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call({:open, %{:customer => customer}}, %{
           :id => id
         }) do
-      {[{:account_opened, %{id: id, customer: customer}}], %{id: id, customer: customer}}
+      {[{:account_opened, %{id: id, customer: customer}}], %{id: id, customer: customer, time_stamp: DateTime.utc_now()}}
     end
     
     def execute_call(_command, _state) do
@@ -40,7 +40,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
           :id => id,
           :state => %{:balance => current_balance}
         }) do
-      {[{:money_deposited_to_account, %{id: id, amount: amount}}],
+      {[{:money_deposited_to_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}],
        %{id: id, balance: current_balance + amount}}
     end
 
@@ -50,7 +50,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
         }) do
       case current_balance do
         balance when balance >= amount ->
-          {[{:money_withdrawn_from_account, %{id: id, amount: amount}}],
+          {[{:money_withdrawn_from_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}],
            %{id: id, balance: current_balance - amount}}
 
         _ ->
@@ -64,7 +64,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
         }) do
       case current_balance do
         0 ->
-          {[{:account_closed, %{id: id}}], %{id: id}}
+          {[{:account_closed, %{id: id}}], %{id: id, time_stamp: DateTime.utc_now()}}
 
         balance when balance > 0 ->
           {:error, "Can't close account with money left"}
@@ -77,7 +77,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     def execute_call(:suspend, %{
           :id => id
         }) do
-      {[{:account_suspended, %{id: id}}], %{id: id}}
+      {[{:account_suspended, %{id: id}}], %{id: id, time_stamp: DateTime.utc_now()}}
     end
 
     def execute_call(:get_balance, %{:id => id, :state => %{:balance => current_balance}}) do

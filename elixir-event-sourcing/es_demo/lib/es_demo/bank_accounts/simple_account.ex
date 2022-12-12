@@ -45,7 +45,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
       }) do
     case {closed, suspended} do
       {false, false} ->
-        {[{:money_deposited_to_account, %{id: id, amount: amount}}],
+        {[{:money_deposited_to_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}],
          %{id: id, balance: current_balance + amount}}
 
       {true, _} ->
@@ -62,7 +62,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
       }) do
     case {current_balance, closed, suspended} do
       {balance, false, false} when balance >= amount ->
-        {[{:money_withdrawn_from_account, %{id: id, amount: amount}}],
+        {[{:money_withdrawn_from_account, %{id: id, amount: amount, time_stamp: DateTime.utc_now()}}],
          %{id: id, balance: current_balance - amount}}
 
       {_, false, false} ->
@@ -82,7 +82,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
       }) do
     case {current_balance, closed, suspended} do
       {0, false, false} ->
-        {[{:account_closed, %{id: id}}], %{id: id}}
+        {[{:account_closed, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
 
       {balance, false, false} when balance > 0 ->
         {:error, "Can't close account with money left"}
@@ -100,7 +100,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
 
   def execute_call(:suspend, %{:id => id, :state => %{:closed => closed, :suspended => suspended}}) do
     case {closed, suspended} do
-      {false, false} -> {[{:account_suspended, %{id: id}}], %{id: id}}
+      {false, false} -> {[{:account_suspended, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
       {true, _} -> {:error, "Can't suspend a closed account"}
       {_, true} -> {:error, "This account is already suspended"}
     end
