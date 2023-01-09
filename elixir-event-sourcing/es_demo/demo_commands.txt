@@ -1,0 +1,37 @@
+account_id = UUID.uuid4()
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, {:open, %{customer: "Mattias"}}, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, {:deposit, %{amount: 100}}, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, {:withdraw, %{amount: 50}}, :in_memory)
+
+EsDemo.cast(EsDemo.BankAccounts.SimpleAccount, account_id, {:withdraw, %{amount: 50}}, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, :get_balance, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, :suspend, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, :restore, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.SimpleAccount, account_id, :close, :in_memory)
+
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, {:open, %{customer: "Mattias"}}, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, {:deposit, %{amount: 100}}, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, {:withdraw, %{amount: 50}}, :in_memory)
+
+EsDemo.cast(EsDemo.BankAccounts.AccountWithBehavior, account_id, {:withdraw, %{amount: 50}}, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, :get_balance, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, :suspend, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, :restore, :in_memory)
+
+EsDemo.call(EsDemo.BankAccounts.AccountWithBehavior, account_id, :close, :in_memory)
+
+:es_db
+:in_memory

@@ -1,7 +1,7 @@
 defmodule EsDemo.BankAccounts.SimpleAccount do
   @moduledoc false
 
-  use Reactive.Entities.PersistedEntity
+  use Eventize.EventSourcedProcess
 
   def child_spec(%{:id => id} = data) do
     %{
@@ -19,11 +19,13 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
     )
   end
 
+  @impl true
   def start(_) do
     %{closed: false, suspended: false, balance: 0}
   end
 
-  def execute_call({:open, %{:customer => customer}}, %{
+  @impl true
+  def execute_call({:open, %{customer: customer}}, _from, %{
         :id => id,
         :state => %{:closed => closed, :suspended => suspended}
       }) do
@@ -40,7 +42,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
     end
   end
 
-  def execute_call({:deposit, %{:amount => amount}}, %{
+  def execute_call({:deposit, %{:amount => amount}}, _from, %{
         :id => id,
         :state => %{:balance => current_balance, :closed => closed, :suspended => suspended}
       }) do
@@ -59,7 +61,7 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
     end
   end
 
-  def execute_call({:withdraw, %{:amount => amount}}, %{
+  def execute_call({:withdraw, %{:amount => amount}}, _from, %{
         :id => id,
         :state => %{:balance => current_balance, :closed => closed, :suspended => suspended}
       }) do
@@ -73,15 +75,15 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
       {_, false, false} ->
         {:error, "Not enough money in account"}
 
-      {true, _} ->
+      {_, true, _} ->
         {:error, "Can't withdraw money from a closed account"}
 
-      {_, true} ->
+      {_, _, true} ->
         {:error, "Can't withdraw money from a suspended account"}
     end
   end
 
-  def execute_call(:close, %{
+  def execute_call(:close, _from, %{
         :id => id,
         :state => %{:balance => current_balance, :closed => closed, :suspended => suspended}
       }) do
@@ -103,7 +105,10 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
     end
   end
 
-  def execute_call(:suspend, %{:id => id, :state => %{:closed => closed, :suspended => suspended}}) do
+  def execute_call(:suspend, _from, %{
+        :id => id,
+        :state => %{:closed => closed, :suspended => suspended}
+      }) do
     case {closed, suspended} do
       {false, false} ->
         {[{:account_suspended, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
@@ -116,38 +121,39 @@ defmodule EsDemo.BankAccounts.SimpleAccount do
     end
   end
 
-  def execute_call(:restore, %{:id => id, :state => %{:suspended => suspended}}) do
+  def execute_call(:restore, _from, %{:id => id, :state => %{:suspended => suspended}}) do
     case suspended do
       true -> {[{:account_restored, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
       _ -> {:error, "This account is not suspended"}
     end
   end
 
-  def execute_call(:get_balance, %{:id => id, :state => %{:balance => current_balance}}) do
+  def execute_call(:get_balance, _from, %{:id => id, :state => %{:balance => current_balance}}) do
     %{id: id, balance: current_balance}
   end
 
-  defp on(state, {:account_opened, %{:customer => customer}}) do
+  @impl true
+  def apply_event(state, {:account_opened, %{:customer => customer}}) do
     Map.put(state, :customer, customer)
   end
 
-  defp on(state, {:money_deposited_to_account, %{:amount => amount}}) do
+  def apply_event(state, {:money_deposited_to_account, %{:amount => amount}}) do
     Map.update(state, :balance, amount, fn current_balance -> current_balance + amount end)
   end
 
-  defp on(state, {:money_withdrawn_from_account, %{:amount => amount}}) do
+  def apply_event(state, {:money_withdrawn_from_account, %{:amount => amount}}) do
     Map.update(state, :balance, amount, fn current_balance -> current_balance - amount end)
   end
 
-  defp on(state, {:account_closed, %{}}) do
+  def apply_event(state, {:account_closed, %{}}) do
     Map.put(state, :closed, true)
   end
 
-  defp on(state, {:account_suspended, %{}}) do
+  def apply_event(state, {:account_suspended, %{}}) do
     Map.put(state, :suspended, true)
   end
 
-  defp on(state, {:account_restored, %{}}) do
+  def apply_event(state, {:account_restored, %{}}) do
     Map.put(state, :suspended, false)
   end
 end

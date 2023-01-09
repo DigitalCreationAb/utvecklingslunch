@@ -1,7 +1,7 @@
 defmodule EsDemo.BankAccounts.AccountWithBehavior do
   @moduledoc false
 
-  use Reactive.Entities.PersistedEntity
+  use Eventize.EventSourcedProcess
 
   def child_spec(%{:id => id} = data) do
     %{
@@ -19,12 +19,13 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     )
   end
 
+  @impl true
   def start(_) do
     {EsDemo.BankAccounts.AccountWithBehavior.NotOpened, %{balance: 0}}
   end
 
   defmodule NotOpened do
-    def execute_call({:open, %{:customer => customer}}, %{
+    def execute_call({:open, %{:customer => customer}}, _from, %{
           :id => id
         }) do
       {[{:account_opened, %{id: id, customer: customer, time_stamp: DateTime.utc_now()}}],
@@ -37,7 +38,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
   end
 
   defmodule Opened do
-    def execute_call({:deposit, %{:amount => amount}}, %{
+    def execute_call({:deposit, %{:amount => amount}}, _from, %{
           :id => id,
           :state => %{:balance => current_balance}
         })
@@ -46,11 +47,11 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
        %{id: id, balance: current_balance + amount}}
     end
 
-    def execute_call({:deposit, %{:amount => amount}}, _context) do
+    def execute_call({:deposit, %{:amount => _amount}}, _from, _context) do
       {:error, "Can't deposit negative amount"}
     end
 
-    def execute_call({:withdraw, %{:amount => amount}}, %{
+    def execute_call({:withdraw, %{:amount => amount}}, _from, %{
           :id => id,
           :state => %{:balance => current_balance}
         })
@@ -61,15 +62,15 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
        ], %{id: id, balance: current_balance - amount}}
     end
 
-    def execute_call({:withdraw, %{:amount => amount}}, _context) when amount <= 0 do
+    def execute_call({:withdraw, %{:amount => amount}}, _from, _context) when amount <= 0 do
       {:error, "Can't withdraw negative amount"}
     end
 
-    def execute_call({:withdraw, _cmd}, _context) do
+    def execute_call({:withdraw, _cmd}, _from, _context) do
       {:error, "Not enough money in account"}
     end
 
-    def execute_call(:close, %{
+    def execute_call(:close, _from, %{
           :id => id,
           :state => %{:balance => current_balance}
         })
@@ -77,31 +78,31 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
       {[{:account_closed, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
     end
 
-    def execute_call(:close, %{
+    def execute_call(:close, _from, %{
           :state => %{:balance => current_balance}
         })
         when current_balance > 0 do
       {:error, "Can't close account with money left"}
     end
 
-    def execute_call(:close, %{
+    def execute_call(:close, _from, %{
           :state => %{:balance => current_balance}
         })
         when current_balance < 0 do
       {:error, "Can't close account with outstanding dept"}
     end
 
-    def execute_call(:suspend, %{
+    def execute_call(:suspend, _from, %{
           :id => id
         }) do
       {[{:account_suspended, %{id: id, time_stamp: DateTime.utc_now()}}], %{id: id}}
     end
 
-    def execute_call(:get_balance, %{:id => id, :state => %{:balance => current_balance}}) do
+    def execute_call(:get_balance, _from, %{:id => id, :state => %{:balance => current_balance}}) do
       %{id: id, balance: current_balance}
     end
 
-    def execute_cast({:withdraw, %{:amount => amount}}, %{
+    def execute_cast({:withdraw, %{:amount => amount}}, _from, %{
           :id => id,
           :state => %{:balance => current_balance}
         })
@@ -111,7 +112,7 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
       ]
     end
 
-    def execute_cast({:withdraw, _cmd}, _context) do
+    def execute_cast({:withdraw, _cmd}, _from, _context) do
     end
   end
 
@@ -163,31 +164,33 @@ defmodule EsDemo.BankAccounts.AccountWithBehavior do
     end
   end
 
-  defp on(state, {:account_opened, %{:customer => customer}}) do
+  @impl true
+  def apply_event(state, {:account_opened, %{:customer => customer}}) do
     {Map.put(state, :customer, customer), EsDemo.BankAccounts.AccountWithBehavior.Opened}
   end
 
-  defp on(state, {:money_deposited_to_account, %{:amount => amount}}) do
+  def apply_event(state, {:money_deposited_to_account, %{:amount => amount}}) do
     Map.update(state, :balance, amount, fn current_balance -> current_balance + amount end)
   end
 
-  defp on(state, {:money_withdrawn_from_account, %{:amount => amount}}) do
+  def apply_event(state, {:money_withdrawn_from_account, %{:amount => amount}}) do
     Map.update(state, :balance, amount, fn current_balance -> current_balance - amount end)
   end
 
-  defp on(state, {:account_closed, _data}) do
+  def apply_event(state, {:account_closed, _data}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Closed}
   end
 
-  defp on(state, {:account_suspended, _data}) do
+  def apply_event(state, {:account_suspended, _data}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Suspended}
   end
 
-  defp on(state, {:account_restored, _data}) do
+  def apply_event(state, {:account_restored, _data}) do
     {state, EsDemo.BankAccounts.AccountWithBehavior.Opened}
   end
 
-  defp get_lifespan({:account_closed, _data}, _state) do
+  @impl true
+  def cleanup({:account_closed, _data}, _state) do
     :stop
   end
 end

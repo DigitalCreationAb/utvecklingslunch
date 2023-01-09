@@ -23,8 +23,10 @@ defmodule EsDemo.MixProject do
   defp deps do
     [
       # {:dep_from_hexpm, "~> 0.3.0"},
-      {:reactive, git: "https://github.com/DigitalCreationAb/reactive.git"},
+      {:eventize, "~> 0.1.3"},
+      {:eventize_eventstore_eventstoredb, "~> 0.1.0"},
       {:elixir_uuid, "~> 1.2"},
+      {:jason, "~> 1.0"},
       {:ex_doc, "~> 0.29.0", only: :dev, runtime: false},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
     ]
