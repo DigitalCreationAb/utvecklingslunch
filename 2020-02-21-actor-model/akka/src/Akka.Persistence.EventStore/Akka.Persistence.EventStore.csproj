@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<LangVersion>default</LangVersion>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<Copyright>Copyright © 2021-2021 Digital Creation Sweden AB</Copyright>
+		<PackageId>DC.Akka.Persistence.EventStore</PackageId>
+		<Authors>Mattias Jakobsson</Authors>
+		<PackageVersion>2.7.0</PackageVersion>
+		<PackageProjectUrl>
+			https://github.com/flysjo/EPRPayPackages
+		</PackageProjectUrl>
+		<PackageTags>akka</PackageTags>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="reference.conf" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Akka.Persistence" Version="1.5.2" />
+	  <PackageReference Include="EventStore.Client" Version="22.0.0" />
+	</ItemGroup>
+	
+	<PropertyGroup>
+		<DefineConstants>$(DefineConstants);CORECLR</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+		<DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+	</PropertyGroup>
+</Project>

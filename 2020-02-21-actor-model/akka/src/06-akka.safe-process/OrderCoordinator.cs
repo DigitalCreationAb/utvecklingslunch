@@ -3,269 +3,202 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Persistence;
 
-namespace _06_akka.safe_process
+namespace _06_akka.safe_process;
+
+public class OrderCoordinator : ReceivePersistentActor
 {
-    public class OrderCoordinator : ReceivePersistentActor
+    public static class Commands
     {
-        public static class Commands
+        public record PlaceOrder(string ProductName, decimal ProductPrice);
+
+        public record CancelOrder(string OrderId);
+
+        public record SendCommandToOrder(string OrderId, object Command);
+    }
+
+    public static class Events
+    {
+        public record OrderReserved(string OrderId)
         {
-            public class PlaceOrder
+            public override string ToString()
             {
-                public PlaceOrder(string productName, decimal productPrice)
-                {
-                    ProductName = productName;
-                    ProductPrice = productPrice;
-                }
-
-                public string ProductName { get; }
-                public decimal ProductPrice { get; }
-            }
-            
-            public class CancelOrder
-            {
-                public CancelOrder(string orderId)
-                {
-                    OrderId = orderId;
-                }
-
-                public string OrderId { get; }
-            }
-            
-            public class SendCommandToOrder
-            {
-                public SendCommandToOrder(string orderId, object command)
-                {
-                    OrderId = orderId;
-                    Command = command;
-                }
-
-                public string OrderId { get; }
-                public object Command { get; }
+                return $"Order {OrderId} was reserved";
             }
         }
-        
-        public static class Events
+
+        public record CancellationStarted(string OrderId)
         {
-            public class OrderReserved
+            public override string ToString()
             {
-                public OrderReserved(string orderId)
-                {
-                    OrderId = orderId;
-                }
-
-                public string OrderId { get; }
-
-                public override string ToString()
-                {
-                    return $"Order {OrderId} was reserved";
-                }
-            }
-            
-            public class CancellationStarted
-            {
-                public CancellationStarted(string orderId)
-                {
-                    OrderId = orderId;
-                }
-
-                public string OrderId { get; }
-                
-                public override string ToString()
-                {
-                    return $"Order {OrderId} cancellation started";
-                }
-            }
-            
-            public class OrderFinished
-            {
-                public OrderFinished(string orderId)
-                {
-                    OrderId = orderId;
-                }
-
-                public string OrderId { get; }
-                
-                public override string ToString()
-                {
-                    return $"Order {OrderId} finished";
-                }
-            }
-            
-            public class OrderCancelled
-            {
-                public OrderCancelled(string orderId)
-                {
-                    OrderId = orderId;
-                }
-
-                public string OrderId { get; }
-
-                public override string ToString()
-                {
-                    return $"Order {OrderId} cancelled";
-                }
+                return $"Order {OrderId} cancellation started";
             }
         }
-        
-        public static class Queries
-        {
-            public class QueryOrder
-            {
-                public QueryOrder(string orderId, object query)
-                {
-                    OrderId = orderId;
-                    Query = query;
-                }
 
-                public string OrderId { get; }
-                public object Query { get; }
+        public record OrderFinished(string OrderId)
+        {
+            public override string ToString()
+            {
+                return $"Order {OrderId} finished";
             }
         }
-        
-        public override string PersistenceId { get; } = "ordercoordinator";
 
-        private int _placedOrders;
-        private readonly IList<string> _currentOrderProcesses = new List<string>();
-        private readonly IList<string> _currentCancellationProcesses = new List<string>();
-        
-        private static IActorRef _coordinatorActor;
-        
-        public OrderCoordinator()
+        public record OrderCancelled(string OrderId)
         {
-            Recover<Events.OrderReserved>(On);
-            Recover<Events.OrderFinished>(On);
-            Recover<Events.CancellationStarted>(On);
-            Recover<Events.OrderCancelled>(On);
-            
-            Command<Commands.PlaceOrder>(cmd =>
+            public override string ToString()
             {
-                var orderId = (_placedOrders + 1).ToString();
+                return $"Order {OrderId} cancelled";
+            }
+        }
+    }
 
-                var order = GetOrder(orderId);
-                
-                Persist(new Events.OrderReserved(orderId), evnt =>
-                {
-                    On(evnt);
-                    
-                    order.Tell(new SalesOrder.Commands.StartOrderProcess(cmd.ProductName, cmd.ProductPrice));
-                });
+    public static class Queries
+    {
+        public record QueryOrder(string OrderId, object Query);
+    }
+
+    public override string PersistenceId => "ordercoordinator";
+
+    private int _placedOrders;
+    private readonly IList<string> _currentOrderProcesses = new List<string>();
+    private readonly IList<string> _currentCancellationProcesses = new List<string>();
+
+    private static IActorRef _coordinatorActor;
+
+    public OrderCoordinator()
+    {
+        Recover<Events.OrderReserved>(On);
+        Recover<Events.OrderFinished>(On);
+        Recover<Events.CancellationStarted>(On);
+        Recover<Events.OrderCancelled>(On);
+
+        Command<Commands.PlaceOrder>(cmd =>
+        {
+            var orderId = (_placedOrders + 1).ToString();
+
+            var order = GetOrder(orderId);
+
+            Persist(new Events.OrderReserved(orderId), evnt =>
+            {
+                On(evnt);
+
+                order.Tell(new SalesOrder.Commands.StartOrderProcess(cmd.ProductName, cmd.ProductPrice));
             });
+        });
 
-            Command<Commands.CancelOrder>(cmd =>
-            {
-                var order = GetOrder(cmd.OrderId);
-
-                order.Tell(new SalesOrder.Commands.StartCancellationProcess());
-            });
-            
-            Command<Commands.SendCommandToOrder>(cmd =>
-            {
-                var order = GetOrder(cmd.OrderId);
-                
-                order.Tell(cmd.Command);
-            });
-            
-            Command<Queries.QueryOrder>(query =>
-            {
-                var order = GetOrder(query.OrderId);
-                
-                order.Tell(query.Query, Sender);
-            });
-
-            Command<SalesOrder.Responses.OrderProcessDoneResponse>(response => { });
-
-            Command<SalesOrder.Responses.CancellationProcessDoneResponse>(response => { });
-        }
-
-        protected override void PreStart()
+        Command<Commands.CancelOrder>(cmd =>
         {
-            foreach (var orderProcess in _currentOrderProcesses)
-            {
-                var order = GetOrder(orderProcess);
-                
-                order.Tell(new SalesOrder.Commands.ContinueOrderProcess());
-            }
+            var order = GetOrder(cmd.OrderId);
 
-            foreach (var cancellationProcess in _currentCancellationProcesses)
-            {
-                var order = GetOrder(cancellationProcess);
-                
-                order.Tell(new SalesOrder.Commands.ContinueCalcellationProcess());
-            }
-        }
+            order.Tell(new SalesOrder.Commands.StartCancellationProcess());
+        });
 
-        public static void Initialize(ActorSystem system)
+        Command<Commands.SendCommandToOrder>(cmd =>
         {
-            _coordinatorActor = system.ActorOf<OrderCoordinator>();
-        }
+            var order = GetOrder(cmd.OrderId);
 
-        public static void PlaceOrder(string productName, decimal productPrice)
+            order.Tell(cmd.Command);
+        });
+
+        Command<Queries.QueryOrder>(query =>
         {
-            _coordinatorActor.Tell(new Commands.PlaceOrder(productName, productPrice));
-        }
+            var order = GetOrder(query.OrderId);
 
-        public static void CancelOrder(string orderId)
+            order.Tell(query.Query, Sender);
+        });
+
+        Command<SalesOrder.Responses.OrderProcessDoneResponse>(_ => { });
+
+        Command<SalesOrder.Responses.CancellationProcessDoneResponse>(_ => { });
+    }
+
+    protected override void PreStart()
+    {
+        foreach (var orderProcess in _currentOrderProcesses)
         {
-            _coordinatorActor.Tell(new Commands.CancelOrder(orderId));
+            var order = GetOrder(orderProcess);
+
+            order.Tell(new SalesOrder.Commands.ContinueOrderProcess());
         }
 
-        public static Task<SalesOrder.Responses.OrderDataResponse> GetOrderData(string orderId)
+        foreach (var cancellationProcess in _currentCancellationProcesses)
         {
-            return _coordinatorActor.Ask<SalesOrder.Responses.OrderDataResponse>(
-                new Queries.QueryOrder(orderId, new SalesOrder.Queries.GetOrderData()));
+            var order = GetOrder(cancellationProcess);
+
+            order.Tell(new SalesOrder.Commands.ContinueCancellationProcess());
         }
+    }
 
-        public static void AddPaymentToOrder(string orderId, decimal amount)
-        {
-            _coordinatorActor.Tell(new Commands.SendCommandToOrder(
-                orderId, 
-                new SalesOrder.Commands.AddPayment(amount)));
-        }
+    public static void Initialize(ActorSystem system)
+    {
+        _coordinatorActor = system.ActorOf<OrderCoordinator>();
+    }
 
-        public static void FinishOrder(string orderId)
-        {
-            _coordinatorActor.Tell(new Commands.SendCommandToOrder(
-                orderId, 
-                new SalesOrder.Commands.FinishOrder()));
-        }
+    public static void PlaceOrder(string productName, decimal productPrice)
+    {
+        _coordinatorActor.Tell(new Commands.PlaceOrder(productName, productPrice));
+    }
 
-        private void On(Events.OrderReserved evnt)
-        {
-            _placedOrders++;
-            
-            if (!_currentOrderProcesses.Contains(evnt.OrderId))
-                _currentOrderProcesses.Add(evnt.OrderId);
-        }
+    public static void CancelOrder(string orderId)
+    {
+        _coordinatorActor.Tell(new Commands.CancelOrder(orderId));
+    }
 
-        private void On(Events.OrderFinished evnt)
-        {
-            if (_currentOrderProcesses.Contains(evnt.OrderId))
-                _currentOrderProcesses.Remove(evnt.OrderId);
-        }
+    public static Task<SalesOrder.Responses.OrderDataResponse> GetOrderData(string orderId)
+    {
+        return _coordinatorActor.Ask<SalesOrder.Responses.OrderDataResponse>(
+            new Queries.QueryOrder(orderId, new SalesOrder.Queries.GetOrderData()));
+    }
 
-        private void On(Events.CancellationStarted evnt)
-        {
-            if (!_currentCancellationProcesses.Contains(evnt.OrderId))
-                _currentCancellationProcesses.Add(evnt.OrderId);
-            
-            if (_currentOrderProcesses.Contains(evnt.OrderId))
-                _currentOrderProcesses.Remove(evnt.OrderId);
-        }
+    public static void AddPaymentToOrder(string orderId, decimal amount)
+    {
+        _coordinatorActor.Tell(new Commands.SendCommandToOrder(
+            orderId,
+            new SalesOrder.Commands.AddPayment(amount)));
+    }
 
-        private void On(Events.OrderCancelled evnt)
-        {
-            if (_currentCancellationProcesses.Contains(evnt.OrderId))
-                _currentCancellationProcesses.Remove(evnt.OrderId);
-        }
+    public static void FinishOrder(string orderId)
+    {
+        _coordinatorActor.Tell(new Commands.SendCommandToOrder(
+            orderId,
+            new SalesOrder.Commands.FinishOrder()));
+    }
 
-        private static IActorRef GetOrder(string orderId)
-        {
-            var order = Context.Child(orderId);
+    private void On(Events.OrderReserved evnt)
+    {
+        _placedOrders++;
 
-            if (Equals(order, ActorRefs.Nobody))
-                order = Context.ActorOf(SalesOrder.Initialize(), orderId);
+        if (!_currentOrderProcesses.Contains(evnt.OrderId))
+            _currentOrderProcesses.Add(evnt.OrderId);
+    }
 
-            return order;
-        }
+    private void On(Events.OrderFinished evnt)
+    {
+        if (_currentOrderProcesses.Contains(evnt.OrderId))
+            _currentOrderProcesses.Remove(evnt.OrderId);
+    }
+
+    private void On(Events.CancellationStarted evnt)
+    {
+        if (!_currentCancellationProcesses.Contains(evnt.OrderId))
+            _currentCancellationProcesses.Add(evnt.OrderId);
+
+        if (_currentOrderProcesses.Contains(evnt.OrderId))
+            _currentOrderProcesses.Remove(evnt.OrderId);
+    }
+
+    private void On(Events.OrderCancelled evnt)
+    {
+        if (_currentCancellationProcesses.Contains(evnt.OrderId))
+            _currentCancellationProcesses.Remove(evnt.OrderId);
+    }
+
+    private static IActorRef GetOrder(string orderId)
+    {
+        var order = Context.Child(orderId);
+
+        if (Equals(order, ActorRefs.Nobody))
+            order = Context.ActorOf(SalesOrder.Initialize(), orderId);
+
+        return order;
     }
 }

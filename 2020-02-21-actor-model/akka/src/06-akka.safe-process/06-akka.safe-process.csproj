@@ -2,18 +2,18 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <RootNamespace>_06_akka.safe_process</RootNamespace>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Akka.Persistence.EventStore.Query" Version="1.3.0" />
-  </ItemGroup>
 
   <ItemGroup>
     <Content Include="akka.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Akka.Persistence.EventStore.Query\Akka.Persistence.EventStore.Query.csproj" />
   </ItemGroup>
 
 </Project>

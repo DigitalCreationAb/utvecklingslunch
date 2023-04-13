@@ -1,62 +1,38 @@
 using Akka.Actor;
 
-namespace _01_akka.basic
+namespace _01_akka.basic;
+
+public class SalesOrder : ReceiveActor
 {
-    public class SalesOrder : ReceiveActor
+    public static class Commands
     {
-        public static class Commands
-        {
-            public class PlaceOrder
-            {
-                public PlaceOrder(string productName, decimal productPrice)
-                {
-                    ProductName = productName;
-                    ProductPrice = productPrice;
-                }
+        public record PlaceOrder(string ProductName, decimal ProductPrice);
+    }
 
-                public string ProductName { get; }
-                public decimal ProductPrice { get; }
-            }
-        }
-        
-        public static class Queries
-        {
-            public class GetOrderData
-            {
-                
-            }
-        }
-        
-        public static class Responses
-        {
-            public class OrderDataResponse
-            {
-                public OrderDataResponse(string productName, decimal productPrice)
-                {
-                    ProductName = productName;
-                    ProductPrice = productPrice;
-                }
+    public static class Queries
+    {
+        public record GetOrderData;
+    }
 
-                public string ProductName { get; }
-                public decimal ProductPrice { get; }
-            }
-        }
+    public static class Responses
+    {
+        public record OrderDataResponse(string? ProductName, decimal ProductPrice);
+    }
 
-        private string _productName;
-        private decimal _productPrice;
-        
-        public SalesOrder()
+    private string? _productName;
+    private decimal _productPrice;
+
+    public SalesOrder()
+    {
+        Receive<Commands.PlaceOrder>(cmd =>
         {
-            Receive<Commands.PlaceOrder>(cmd =>
-            {
-                _productName = cmd.ProductName;
-                _productPrice = cmd.ProductPrice;
-            });
+            _productName = cmd.ProductName;
+            _productPrice = cmd.ProductPrice;
+        });
 
-            Receive<Queries.GetOrderData>(query =>
-            {
-                Sender.Tell(new Responses.OrderDataResponse(_productName, _productPrice));
-            });
-        }
+        Receive<Queries.GetOrderData>(_ =>
+        {
+            Sender.Tell(new Responses.OrderDataResponse(_productName, _productPrice));
+        });
     }
 }

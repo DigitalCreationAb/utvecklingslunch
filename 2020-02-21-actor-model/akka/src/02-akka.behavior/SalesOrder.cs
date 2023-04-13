@@ -1,72 +1,48 @@
 using Akka.Actor;
 
-namespace _02_akka.behavior
+namespace _02_akka.behavior;
+
+public class SalesOrder : ReceiveActor
 {
-    public class SalesOrder : ReceiveActor
+    public static class Commands
     {
-        public static class Commands
-        {
-            public class PlaceOrder
-            {
-                public PlaceOrder(string productName, decimal productPrice)
-                {
-                    ProductName = productName;
-                    ProductPrice = productPrice;
-                }
+        public record PlaceOrder(string ProductName, decimal ProductPrice);
+    }
 
-                public string ProductName { get; }
-                public decimal ProductPrice { get; }
-            }
-        }
-        
-        public static class Queries
-        {
-            public class GetOrderData
-            {
-                
-            }
-        }
-        
-        public static class Responses
-        {
-            public class OrderDataResponse
-            {
-                public OrderDataResponse(string productName, decimal productPrice)
-                {
-                    ProductName = productName;
-                    ProductPrice = productPrice;
-                }
+    public static class Queries
+    {
+        public record GetOrderData;
+    }
 
-                public string ProductName { get; }
-                public decimal ProductPrice { get; }
-            }
-        }
+    public static class Responses
+    {
+        public record OrderDataResponse(string? ProductName, decimal ProductPrice);
+    }
 
-        private string _productName;
-        private decimal _productPrice;
-        
-        public SalesOrder()
-        {
-            Become(New);
-        }
+    private string? _productName;
+    private decimal _productPrice;
 
-        private void New()
-        {
-            Receive<Commands.PlaceOrder>(cmd =>
-            {
-                _productName = cmd.ProductName;
-                _productPrice = cmd.ProductPrice;
-                
-                Become(Placed);
-            });
-        }
+    public SalesOrder()
+    {
+        Become(New);
+    }
 
-        private void Placed()
+    private void New()
+    {
+        Receive<Commands.PlaceOrder>(cmd =>
         {
-            Receive<Queries.GetOrderData>(query =>
-            {
-                Sender.Tell(new Responses.OrderDataResponse(_productName, _productPrice));
-            });
-        }
+            _productName = cmd.ProductName;
+            _productPrice = cmd.ProductPrice;
+
+            Become(Placed);
+        });
+    }
+
+    private void Placed()
+    {
+        Receive<Queries.GetOrderData>(_ =>
+        {
+            Sender.Tell(new Responses.OrderDataResponse(_productName, _productPrice));
+        });
     }
 }

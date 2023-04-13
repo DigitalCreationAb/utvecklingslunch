@@ -2,15 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <RootNamespace>_05_akka.async</RootNamespace>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Akka.Persistence" Version="1.3.17" />
-    <PackageReference Include="Akka.Persistence.EventStore" Version="1.3.0" />
-    <PackageReference Include="Akka.Persistence.EventStore.Query" Version="1.3.0" />
-    <PackageReference Include="Akka.Persistence.Query" Version="1.3.17" />
+    <PackageReference Include="Akka.Persistence" Version="1.5.2" />
+    <PackageReference Include="Akka.Persistence.Query" Version="1.5.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +17,10 @@
     <Content Include="akka.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Akka.Persistence.EventStore.Query\Akka.Persistence.EventStore.Query.csproj" />
   </ItemGroup>
 
 </Project>

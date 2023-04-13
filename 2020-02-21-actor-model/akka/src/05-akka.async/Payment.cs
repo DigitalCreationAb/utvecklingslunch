@@ -2,187 +2,142 @@ using System;
 using Akka.Actor;
 using Akka.Persistence;
 
-namespace _05_akka.async
+namespace _05_akka.async;
+
+public class Payment : ReceivePersistentActor
 {
-    public class Payment : ReceivePersistentActor
+    public static class Commands
     {
-        public static class Commands
+        public record ChargePayment;
+
+        public record RefundPayment;
+    }
+
+    public static class Events
+    {
+        public record PaymentCharged(string PaymentId, decimal Amount)
         {
-            public class ChargePayment
+            public override string ToString()
             {
-                
-            }
-            
-            public class RefundPayment
-            {
-                
-            }
-        }
-        
-        public static class Events
-        {
-            public class PaymentCharged
-            {
-                public PaymentCharged(string paymentId, decimal amount)
-                {
-                    PaymentId = paymentId;
-                    Amount = amount;
-                }
-
-                public string PaymentId { get; }
-                public decimal Amount { get; }
-
-                public override string ToString()
-                {
-                    return $"Payment {PaymentId} charged with the amount {Amount:N2}";
-                }
-            }
-            
-            public class PaymentChargeFailed
-            {
-                public PaymentChargeFailed(string paymentId, string reason)
-                {
-                    PaymentId = paymentId;
-                    Reason = reason;
-                }
-
-                public string PaymentId { get; }
-                public string Reason { get; }
-
-                public override string ToString()
-                {
-                    return $"Payment {PaymentId} failed charging. Reason: \"{Reason}\"";
-                }
-            }
-            
-            public class PaymentRefunded
-            {
-                public PaymentRefunded(string paymentId, decimal amount)
-                {
-                    PaymentId = paymentId;
-                    Amount = amount;
-                }
-
-                public string PaymentId { get; }
-                public decimal Amount { get; }
-
-                public override string ToString()
-                {
-                    return $"Payment {PaymentId} refunded the amount {Amount}";
-                }
-            }
-            
-            public class PaymentRefundFailed
-            {
-                public PaymentRefundFailed(string paymentId, string reason)
-                {
-                    PaymentId = paymentId;
-                    Reason = reason;
-                }
-
-                public string PaymentId { get; }
-                public string Reason { get; }
-
-                public override string ToString()
-                {
-                    return $"Payment {PaymentId} failed refunding. Reason: \"{Reason}\"";
-                }
+                return $"Payment {PaymentId} charged with the amount {Amount:N2}";
             }
         }
 
-        private readonly decimal _amount;
-
-        public override string PersistenceId => $"payments-{PaymentId}";
-
-        private string PaymentId => Self.Path.Name;
-
-        public Payment(decimal amount)
+        public record PaymentChargeFailed(string PaymentId, string Reason)
         {
-            _amount = amount;
-            
-            Recover<Events.PaymentCharged>(On);
-            Recover<Events.PaymentChargeFailed>(On);
-            Recover<Events.PaymentRefunded>(On);
-            Recover<Events.PaymentRefundFailed>(On);
-            
-            Become(Initialized);
-        }
-        
-        private void Initialized()
-        {
-            Command<Commands.ChargePayment>(cmd =>
+            public override string ToString()
             {
-                PersistAndNotifyParent(new Events.PaymentCharged(PaymentId, _amount), On);
-            });
-            
-            Command<Commands.RefundPayment>(cmd =>
+                return $"Payment {PaymentId} failed charging. Reason: \"{Reason}\"";
+            }
+        }
+
+        public record PaymentRefunded(string PaymentId, decimal Amount)
+        {
+            public override string ToString()
             {
-                PersistAndNotifyParent(new Events.PaymentRefunded(PaymentId, _amount), On);
-            });
+                return $"Payment {PaymentId} refunded the amount {Amount}";
+            }
         }
 
-        private void Charged()
+        public record PaymentRefundFailed(string PaymentId, string Reason)
         {
-            Command<Commands.ChargePayment>(cmd =>
+            public override string ToString()
             {
-                PersistAndNotifyParent(
-                    new Events.PaymentChargeFailed(PaymentId, "This payment has already been charged"), On);
-            });
-            
-            Command<Commands.RefundPayment>(cmd =>
-            {
-                PersistAndNotifyParent(new Events.PaymentRefunded(PaymentId, _amount), On);
-            });
+                return $"Payment {PaymentId} failed refunding. Reason: \"{Reason}\"";
+            }
         }
+    }
 
-        private void Refunded()
-        {
-            Command<Commands.ChargePayment>(cmd =>
-            {
-                PersistAndNotifyParent(
-                    new Events.PaymentChargeFailed(PaymentId, "This payment has been refunded"), On);
-            });
-            
-            Command<Commands.RefundPayment>(cmd =>
-            {
-                PersistAndNotifyParent(
-                    new Events.PaymentRefundFailed(PaymentId, "This payment has already been refunded"), On);
-            });
-        }
+    private readonly decimal _amount;
 
-        private void PersistAndNotifyParent<TEvent>(TEvent evnt, Action<TEvent> handler)
-        {
-            Persist(evnt, savedEvent =>
-            {
-                handler(savedEvent);
-                
-                Context.Parent.Tell(evnt);
-            });
-        }
+    public override string PersistenceId => $"payments-{PaymentId}";
 
-        private void On(Events.PaymentCharged evnt)
-        {
-            Become(Charged);
-        }
+    private string PaymentId => Self.Path.Name;
 
-        private void On(Events.PaymentChargeFailed evnt)
-        {
-            
-        }
-        
-        private void On(Events.PaymentRefunded evnt)
-        {
-            Become(Refunded);
-        }
+    public Payment(decimal amount)
+    {
+        _amount = amount;
 
-        private void On(Events.PaymentRefundFailed evnt)
-        {
-            
-        }
+        Recover<Events.PaymentCharged>(On);
+        Recover<Events.PaymentChargeFailed>(On);
+        Recover<Events.PaymentRefunded>(On);
+        Recover<Events.PaymentRefundFailed>(On);
 
-        public static Props Initialize(decimal amount)
+        Become(Initialized);
+    }
+
+    private void Initialized()
+    {
+        Command<Commands.ChargePayment>(_ =>
         {
-            return Props.Create(() => new Payment(amount));
-        }
+            PersistAndNotifyParent(new Events.PaymentCharged(PaymentId, _amount), On);
+        });
+
+        Command<Commands.RefundPayment>(_ =>
+        {
+            PersistAndNotifyParent(new Events.PaymentRefunded(PaymentId, _amount), On);
+        });
+    }
+
+    private void Charged()
+    {
+        Command<Commands.ChargePayment>(_ =>
+        {
+            PersistAndNotifyParent(
+                new Events.PaymentChargeFailed(PaymentId, "This payment has already been charged"), On);
+        });
+
+        Command<Commands.RefundPayment>(_ =>
+        {
+            PersistAndNotifyParent(new Events.PaymentRefunded(PaymentId, _amount), On);
+        });
+    }
+
+    private void Refunded()
+    {
+        Command<Commands.ChargePayment>(_ =>
+        {
+            PersistAndNotifyParent(
+                new Events.PaymentChargeFailed(PaymentId, "This payment has been refunded"), On);
+        });
+
+        Command<Commands.RefundPayment>(_ =>
+        {
+            PersistAndNotifyParent(
+                new Events.PaymentRefundFailed(PaymentId, "This payment has already been refunded"), On);
+        });
+    }
+
+    private void PersistAndNotifyParent<TEvent>(TEvent evnt, Action<TEvent> handler)
+    {
+        Persist(evnt, savedEvent =>
+        {
+            handler(savedEvent);
+
+            Context.Parent.Tell(evnt);
+        });
+    }
+
+    private void On(Events.PaymentCharged evnt)
+    {
+        Become(Charged);
+    }
+
+    private void On(Events.PaymentChargeFailed evnt)
+    {
+    }
+
+    private void On(Events.PaymentRefunded evnt)
+    {
+        Become(Refunded);
+    }
+
+    private void On(Events.PaymentRefundFailed evnt)
+    {
+    }
+
+    public static Props Initialize(decimal amount)
+    {
+        return Props.Create(() => new Payment(amount));
     }
 }

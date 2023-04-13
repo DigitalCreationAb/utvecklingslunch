@@ -9,7 +9,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{B795547D
 ProjectSection(SolutionItems) = preProject
 	..\..\.gitignore = ..\..\.gitignore
 	Makefile = Makefile
-	Makefile.win = Makefile.win
 EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "02-akka.behavior", "src\02-akka.behavior\02-akka.behavior.csproj", "{0148359E-FCF5-4204-B5BC-320E91C3D9B1}"
@@ -21,6 +20,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "05-akka.async", "src\05-akka.async\05-akka.async.csproj", "{73AA3F89-3F1F-41E7-9224-F122447E82FB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "06-akka.safe-process", "src\06-akka.safe-process\06-akka.safe-process.csproj", "{D01381BD-A5C5-44E7-B212-B6D118A3CD59}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akka.Persistence.EventStore", "src\Akka.Persistence.EventStore\Akka.Persistence.EventStore.csproj", "{E795A132-3BAB-495B-A7DB-01CD775250C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Akka.Persistence.EventStore.Query", "src\Akka.Persistence.EventStore.Query\Akka.Persistence.EventStore.Query.csproj", "{CD8E7BF1-D852-412E-B0B0-74868EEEE394}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -107,5 +110,29 @@ Global
 		{D01381BD-A5C5-44E7-B212-B6D118A3CD59}.Release|x64.Build.0 = Release|Any CPU
 		{D01381BD-A5C5-44E7-B212-B6D118A3CD59}.Release|x86.ActiveCfg = Release|Any CPU
 		{D01381BD-A5C5-44E7-B212-B6D118A3CD59}.Release|x86.Build.0 = Release|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Debug|x64.Build.0 = Debug|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Debug|x86.Build.0 = Debug|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Release|x64.ActiveCfg = Release|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Release|x64.Build.0 = Release|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Release|x86.ActiveCfg = Release|Any CPU
+		{E795A132-3BAB-495B-A7DB-01CD775250C4}.Release|x86.Build.0 = Release|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Debug|x64.Build.0 = Debug|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Debug|x86.Build.0 = Debug|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Release|x64.ActiveCfg = Release|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Release|x64.Build.0 = Release|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Release|x86.ActiveCfg = Release|Any CPU
+		{CD8E7BF1-D852-412E-B0B0-74868EEEE394}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

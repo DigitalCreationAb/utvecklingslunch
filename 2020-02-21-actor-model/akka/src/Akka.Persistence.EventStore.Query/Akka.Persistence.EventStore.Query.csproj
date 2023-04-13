@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Akka.Persistence.EventStore.Query</AssemblyName>
+    <RootNamespace>Akka.Persistence.EventStore.Query</RootNamespace>
+    <LangVersion>default</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Copyright>Copyright © 2021-2021 Digital Creation Sweden AB</Copyright>
+    <PackageId>DC.Akka.Persistence.EventStore.Query</PackageId>
+    <Authors>Mattias Jakobsson</Authors>
+    <PackageVersion>2.4.0</PackageVersion>
+    <PackageProjectUrl>
+      https://github.com/flysjo/EPRPayPackages
+    </PackageProjectUrl>
+    <PackageTags>akka</PackageTags>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="reference.conf" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Akka.Persistence.EventStore\Akka.Persistence.EventStore.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Akka.Persistence.Query" Version="1.5.2" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);CORECLR</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+  </PropertyGroup>
+
+</Project>

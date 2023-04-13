@@ -1,162 +1,122 @@
+using System.Diagnostics.CodeAnalysis;
 using Akka.Actor;
 using Akka.Persistence;
 
-namespace _04_akka.persistence
+namespace _04_akka.persistence;
+
+public class Payment : ReceivePersistentActor
 {
-    public class Payment : ReceivePersistentActor
+    public static class Commands
     {
-        public static class Commands
+        public record ChargePayment;
+
+        public record RefundPayment;
+    }
+
+    public static class Events
+    {
+        public record PaymentCharged(string PaymentId, decimal Amount);
+
+        public record PaymentRefunded(string PaymentId, decimal Amount);
+    }
+
+    public static class Responses
+    {
+        public record ChargePaymentResponse(decimal Amount, string? ErrorMessage = null)
         {
-            public class ChargePayment
-            {
-                
-            }
-            
-            public class RefundPayment
-            {
-                
-            }
-        }
-        
-        public static class Events
-        {
-            public class PaymentCharged
-            {
-                public PaymentCharged(string paymentId, decimal amount)
-                {
-                    PaymentId = paymentId;
-                    Amount = amount;
-                }
-
-                public string PaymentId { get; }
-                public decimal Amount { get; }
-            }
-            
-            public class PaymentRefunded
-            {
-                public PaymentRefunded(string paymentId, decimal amount)
-                {
-                    PaymentId = paymentId;
-                    Amount = amount;
-                }
-
-                public string PaymentId { get; }
-                public decimal Amount { get; }
-            }
-        }
-        
-        public static class Responses
-        {
-            public class ChargePaymentResponse
-            {
-                public ChargePaymentResponse(decimal amount, string errorMessage = "")
-                {
-                    Amount = amount;
-                    ErrorMessage = errorMessage;
-                }
-
-                public decimal Amount { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
-            }
-            
-            public class RefundPaymentResponse
-            {
-                public RefundPaymentResponse(decimal amount, string errorMessage = "")
-                {
-                    Amount = amount;
-                    ErrorMessage = errorMessage;
-                }
-
-                public decimal Amount { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
-            }
+            [MemberNotNullWhen(false, nameof(ErrorMessage))]
+            public bool Success => string.IsNullOrEmpty(ErrorMessage);
         }
 
-        private readonly decimal _amount;
-
-        public override string PersistenceId => $"payments-{PaymentId}";
-
-        private string PaymentId => Self.Path.Name;
-
-        public Payment(decimal amount)
+        public record RefundPaymentResponse(decimal Amount, string? ErrorMessage = null)
         {
-            _amount = amount;
-            
-            Recover<Events.PaymentCharged>(On);
-            Recover<Events.PaymentRefunded>(On);
-            
-            Become(Initialized);
+            [MemberNotNullWhen(false, nameof(ErrorMessage))]
+            public bool Success => string.IsNullOrEmpty(ErrorMessage);
         }
+    }
 
-        private void Initialized()
+    private readonly decimal _amount;
+
+    public override string PersistenceId => $"payments-{PaymentId}";
+
+    private string PaymentId => Self.Path.Name;
+
+    public Payment(decimal amount)
+    {
+        _amount = amount;
+
+        Recover<Events.PaymentCharged>(On);
+        Recover<Events.PaymentRefunded>(On);
+
+        Become(Initialized);
+    }
+
+    private void Initialized()
+    {
+        Command<Commands.ChargePayment>(_ =>
         {
-            Command<Commands.ChargePayment>(cmd =>
+            Persist(new Events.PaymentCharged(PaymentId, _amount), evnt =>
             {
-                Persist(new Events.PaymentCharged(PaymentId, _amount), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.ChargePaymentResponse(_amount));
-                });
+                On(evnt);
+
+                Sender.Tell(new Responses.ChargePaymentResponse(_amount));
             });
-            
-            Command<Commands.RefundPayment>(cmd =>
-            {
-                Persist(new Events.PaymentRefunded(PaymentId, _amount), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.RefundPaymentResponse(_amount));
-                });
-            });
-        }
+        });
 
-        private void Charged()
+        Command<Commands.RefundPayment>(_ =>
         {
-            Command<Commands.ChargePayment>(cmd =>
+            Persist(new Events.PaymentRefunded(PaymentId, _amount), evnt =>
             {
-                Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has already been charged"));
-            });
-            
-            Command<Commands.RefundPayment>(cmd =>
-            {
-                Persist(new Events.PaymentRefunded(PaymentId, _amount), evnt =>
-                {
-                    On(evnt);
-                    
-                    Sender.Tell(new Responses.RefundPaymentResponse(_amount));
-                });
-            });
-        }
+                On(evnt);
 
-        private void Refunded()
-        {
-            Command<Commands.ChargePayment>(cmd =>
-            {
-                Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has been refunded"));
+                Sender.Tell(new Responses.RefundPaymentResponse(_amount));
             });
-            
-            Command<Commands.RefundPayment>(cmd =>
-            {
-                Sender.Tell(new Responses.RefundPaymentResponse(0, "This payment has already been refunded"));
-            });
-        }
-        
-        private void On(Events.PaymentCharged evnt)
-        {
-            Become(Charged);
-        }
+        });
+    }
 
-        private void On(Events.PaymentRefunded evnt)
+    private void Charged()
+    {
+        Command<Commands.ChargePayment>(_ =>
         {
-            Become(Refunded);
-        }
-        
-        public static Props Initialize(decimal amount)
+            Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has already been charged"));
+        });
+
+        Command<Commands.RefundPayment>(_ =>
         {
-            return Props.Create(() => new Payment(amount));
-        }
+            Persist(new Events.PaymentRefunded(PaymentId, _amount), evnt =>
+            {
+                On(evnt);
+
+                Sender.Tell(new Responses.RefundPaymentResponse(_amount));
+            });
+        });
+    }
+
+    private void Refunded()
+    {
+        Command<Commands.ChargePayment>(_ =>
+        {
+            Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has been refunded"));
+        });
+
+        Command<Commands.RefundPayment>(_ =>
+        {
+            Sender.Tell(new Responses.RefundPaymentResponse(0, "This payment has already been refunded"));
+        });
+    }
+
+    private void On(Events.PaymentCharged evnt)
+    {
+        Become(Charged);
+    }
+
+    private void On(Events.PaymentRefunded evnt)
+    {
+        Become(Refunded);
+    }
+
+    public static Props Initialize(decimal amount)
+    {
+        return Props.Create(() => new Payment(amount));
     }
 }

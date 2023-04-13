@@ -1,108 +1,88 @@
+using System.Diagnostics.CodeAnalysis;
 using Akka.Actor;
 
-namespace _03_akka.children
+namespace _03_akka.children;
+
+public class Payment : ReceiveActor
 {
-    public class Payment : ReceiveActor
+    public static class Commands
     {
-        public static class Commands
-        {
-            public class ChargePayment
-            {
-                
-            }
-            
-            public class RefundPayment
-            {
-                
-            }
-        }
+        public record ChargePayment;
+
+        public record RefundPayment;
+    }
         
-        public static class Responses
+    public static class Responses
+    {
+        public record ChargePaymentResponse(decimal Amount, string? ErrorMessage = null)
         {
-            public class ChargePaymentResponse
-            {
-                public ChargePaymentResponse(decimal amount, string errorMessage = "")
-                {
-                    Amount = amount;
-                    ErrorMessage = errorMessage;
-                }
-
-                public decimal Amount { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
-            }
-            
-            public class RefundPaymentResponse
-            {
-                public RefundPaymentResponse(decimal amount, string errorMessage = "")
-                {
-                    Amount = amount;
-                    ErrorMessage = errorMessage;
-                }
-
-                public decimal Amount { get; }
-                public string ErrorMessage { get; }
-                public bool Success => string.IsNullOrEmpty(ErrorMessage);
-            }
+            [MemberNotNullWhen(false, nameof(ErrorMessage))]
+            public bool Success => string.IsNullOrEmpty(ErrorMessage);
         }
 
-        private readonly decimal _amount;
-
-        public Payment(decimal amount)
+        public record RefundPaymentResponse(decimal Amount, string? ErrorMessage = null)
         {
-            _amount = amount;
-            
-            Become(Initialized);
+            [MemberNotNullWhen(false, nameof(ErrorMessage))]
+            public bool Success => string.IsNullOrEmpty(ErrorMessage);
         }
+    }
+
+    private readonly decimal _amount;
+
+    public Payment(decimal amount)
+    {
+        _amount = amount;
+            
+        Become(Initialized);
+    }
         
-        private void Initialized()
+    private void Initialized()
+    {
+        Receive<Commands.ChargePayment>(cmd =>
         {
-            Receive<Commands.ChargePayment>(cmd =>
-            {
-                Sender.Tell(new Responses.ChargePaymentResponse(_amount));
+            Sender.Tell(new Responses.ChargePaymentResponse(_amount));
                 
-                Become(Charged);
-            });
+            Become(Charged);
+        });
             
-            Receive<Commands.RefundPayment>(cmd =>
-            {
-                Sender.Tell(new Responses.RefundPaymentResponse(_amount));
+        Receive<Commands.RefundPayment>(cmd =>
+        {
+            Sender.Tell(new Responses.RefundPaymentResponse(_amount));
                 
-                Become(Refunded);
-            });
-        }
+            Become(Refunded);
+        });
+    }
 
-        private void Charged()
+    private void Charged()
+    {
+        Receive<Commands.ChargePayment>(cmd =>
         {
-            Receive<Commands.ChargePayment>(cmd =>
-            {
-                Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has already been charged"));
-            });
+            Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has already been charged"));
+        });
             
-            Receive<Commands.RefundPayment>(cmd =>
-            {
-                Become(Refunded);
+        Receive<Commands.RefundPayment>(cmd =>
+        {
+            Become(Refunded);
                 
-                Sender.Tell(new Responses.RefundPaymentResponse(_amount));
-            });
-        }
+            Sender.Tell(new Responses.RefundPaymentResponse(_amount));
+        });
+    }
 
-        private void Refunded()
+    private void Refunded()
+    {
+        Receive<Commands.ChargePayment>(cmd =>
         {
-            Receive<Commands.ChargePayment>(cmd =>
-            {
-                Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has been refunded"));
-            });
+            Sender.Tell(new Responses.ChargePaymentResponse(0, "This payment has been refunded"));
+        });
             
-            Receive<Commands.RefundPayment>(cmd =>
-            {
-                Sender.Tell(new Responses.RefundPaymentResponse(0, "This payment has already been refunded"));
-            });
-        }
-
-        public static Props Initialize(decimal amount)
+        Receive<Commands.RefundPayment>(cmd =>
         {
-            return Props.Create(() => new Payment(amount));
-        }
+            Sender.Tell(new Responses.RefundPaymentResponse(0, "This payment has already been refunded"));
+        });
+    }
+
+    public static Props Initialize(decimal amount)
+    {
+        return Props.Create(() => new Payment(amount));
     }
 }

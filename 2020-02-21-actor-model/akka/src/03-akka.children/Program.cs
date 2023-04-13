@@ -3,196 +3,198 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Akka.Actor;
 
-namespace _03_akka.children
+namespace _03_akka.children;
+
+public static class Program
 {
-    public static class Program
+    private static readonly IDictionary<string, IActorRef> Orders = new Dictionary<string, IActorRef>();
+    private static readonly ActorSystem System = ActorSystem.Create("children");
+
+    public static async Task Main()
     {
-        private static readonly IDictionary<string, IActorRef> Orders = new Dictionary<string, IActorRef>();
-        private static readonly ActorSystem System = ActorSystem.Create("children");
-        
-        public static async Task Main()
+        var commands = new Dictionary<string, Func<Task<NextStep>>>
         {
-            var commands = new Dictionary<string, Func<Task<NextStep>>>
-            {
-                ["exit"] = Exit,
-                ["new"] = PlaceOrder,
-                ["get"] = GetOrderData,
-                ["add-payment"] = AddPaymentToOrder,
-                ["confirm-order"] = ConfirmOrder,
-                ["cancel-order"] = CancelOrder
-            };
-            
-            while (true)
-            {
-                Console.WriteLine($"Please enter a command ({string.Join(", ", commands.Keys)}):");
-                var command = Console.ReadLine() ?? "";
-                
-                if (!commands.ContainsKey(command))
-                {
-                    Console.WriteLine($"You have to enter a valid command ({string.Join(", ", commands.Keys)})");
-                    continue;
-                }
+            ["exit"] = Exit,
+            ["new"] = PlaceOrder,
+            ["get"] = GetOrderData,
+            ["add-payment"] = AddPaymentToOrder,
+            ["confirm-order"] = ConfirmOrder,
+            ["cancel-order"] = CancelOrder
+        };
 
-                var nextStep = await commands[command]();
-                
-                if (nextStep == NextStep.Exit)
-                    break;
+        while (true)
+        {
+            Console.WriteLine($"Please enter a command ({string.Join(", ", commands.Keys)}):");
+            var command = Console.ReadLine() ?? "";
+
+            if (!commands.ContainsKey(command))
+            {
+                Console.WriteLine($"You have to enter a valid command ({string.Join(", ", commands.Keys)})");
+                continue;
             }
-            
-            await CoordinatedShutdown
-                .Get(System)
-                .Run(CoordinatedShutdown.ClrExitReason.Instance);
+
+            var nextStep = await commands[command]();
+
+            if (nextStep == NextStep.Exit)
+                break;
         }
 
-        private static Task<NextStep> Exit()
+        await CoordinatedShutdown
+            .Get(System)
+            .Run(CoordinatedShutdown.ClrExitReason.Instance);
+    }
+
+    private static Task<NextStep> Exit()
+    {
+        return Task.FromResult(NextStep.Exit);
+    }
+
+    private static async Task<NextStep> PlaceOrder()
+    {
+        var orderId = (Orders.Count + 1).ToString();
+
+        var order = System.ActorOf<SalesOrder>(orderId);
+
+        Orders[orderId] = order;
+
+        Console.WriteLine("Enter a product name:");
+        var productName = Console.ReadLine() ?? "";
+
+        Console.WriteLine("Enter a product price:");
+        var productPrice = decimal.Parse(Console.ReadLine() ?? "");
+
+        var response =
+            await order.Ask<SalesOrder.Responses.PlaceOrderResponse>(
+                new SalesOrder.Commands.PlaceOrder(productName, productPrice));
+
+        if (!response.Success)
         {
-            return Task.FromResult(NextStep.Exit);
+            foreach (var error in response.Errors)
+                Console.WriteLine(error);
+        }
+        else
+        {
+            Console.WriteLine($"Order with id {orderId} was placed.");
         }
 
-        private static async Task<NextStep> PlaceOrder()
+        return NextStep.Continue;
+    }
+
+    private static async Task<NextStep> GetOrderData()
+    {
+        Console.WriteLine("What order do you want to see?");
+        var orderId = Console.ReadLine() ?? "";
+
+        if (!Orders.ContainsKey(orderId))
         {
-            var orderId = (Orders.Count + 1).ToString();
-
-            var order = System.ActorOf<SalesOrder>(orderId);
-
-            Orders[orderId] = order;
-            
-            Console.WriteLine("Enter a product name:");
-            var productName = Console.ReadLine() ?? "";
-            
-            Console.WriteLine("Enter a product price:");
-            var productPrice = decimal.Parse(Console.ReadLine() ?? "");
-
-            var response = await order.Ask<SalesOrder.Responses.PlaceOrderResponse>(new SalesOrder.Commands.PlaceOrder(productName, productPrice));
-
-            if (!response.Success)
-            {
-                foreach (var error in response.Errors)
-                    Console.WriteLine(error);
-            }
-            else
-            {
-                Console.WriteLine($"Order with id {orderId} was placed.");   
-            }
+            Console.WriteLine($"There is not order with id {orderId}");
 
             return NextStep.Continue;
         }
 
-        private static async Task<NextStep> GetOrderData()
+        var order = Orders[orderId];
+
+        var response =
+            await order.Ask<SalesOrder.Responses.OrderDataResponse>(new SalesOrder.Queries.GetOrderData());
+
+        Console.WriteLine(
+            $"Order: {orderId}, Product name: {response.ProductName}, Product price: {response.ProductPrice:N2}, Status: {response.Status}");
+
+        return NextStep.Continue;
+    }
+
+    private static async Task<NextStep> AddPaymentToOrder()
+    {
+        Console.WriteLine("What order do you want to add a payment to?");
+        var orderId = Console.ReadLine() ?? "";
+
+        if (!Orders.ContainsKey(orderId))
         {
-            Console.WriteLine("What order do you want to see?");
-            var orderId = Console.ReadLine() ?? "";
-
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
-
-                return NextStep.Continue;
-            }
-
-            var order = Orders[orderId];
-
-            var response =
-                await order.Ask<SalesOrder.Responses.OrderDataResponse>(new SalesOrder.Queries.GetOrderData());
-            
-            Console.WriteLine($"Order: {orderId}, Product name: {response.ProductName}, Product price: {response.ProductPrice:N2}, Status: {response.Status}");
-
-            return NextStep.Continue;
-        }
-        
-        private static async Task<NextStep> AddPaymentToOrder()
-        {
-            Console.WriteLine("What order do you want to add a payment to?");
-            var orderId = Console.ReadLine() ?? "";
-            
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
-
-                return NextStep.Continue;
-            }
-            
-            var order = Orders[orderId];
-            
-            Console.WriteLine("How much do you want to pay?");
-            var amount = decimal.Parse(Console.ReadLine() ?? "");
-
-            var response =
-                await order.Ask<SalesOrder.Responses.AddPaymentResponse>(new SalesOrder.Commands.AddPayment(amount));
-
-            Console.WriteLine(!response.Success ? response.ErrorMessage : "Successfully added payment to order");
+            Console.WriteLine($"There is not order with id {orderId}");
 
             return NextStep.Continue;
         }
 
-        private static async Task<NextStep> ConfirmOrder()
+        var order = Orders[orderId];
+
+        Console.WriteLine("How much do you want to pay?");
+        var amount = decimal.Parse(Console.ReadLine() ?? "");
+
+        var response =
+            await order.Ask<SalesOrder.Responses.AddPaymentResponse>(new SalesOrder.Commands.AddPayment(amount));
+
+        Console.WriteLine(!response.Success ? response.ErrorMessage : $"Successfully added payment to order: {response.PaymentId}");
+
+        return NextStep.Continue;
+    }
+
+    private static async Task<NextStep> ConfirmOrder()
+    {
+        Console.WriteLine("What order do you want to confirm?");
+        var orderId = Console.ReadLine() ?? "";
+
+        if (!Orders.ContainsKey(orderId))
         {
-            Console.WriteLine("What order do you want to confirm?");
-            var orderId = Console.ReadLine() ?? "";
-            
-            if (!Orders.ContainsKey(orderId))
-            {
-                Console.WriteLine($"There is not order with id {orderId}");
-
-                return NextStep.Continue;
-            }
-            
-            var order = Orders[orderId];
-
-            var response =
-                await order.Ask<SalesOrder.Responses.ConfirmOrderResponse>(new SalesOrder.Commands.ConfirmOrder());
-
-            if (!response.Success)
-            {
-                foreach (var error in response.Errors)
-                {
-                    Console.WriteLine(error);
-                }
-            }
-            else
-            {
-                Console.WriteLine("Successfully confirmed the order");
-            }
+            Console.WriteLine($"There is not order with id {orderId}");
 
             return NextStep.Continue;
         }
 
-        private static async Task<NextStep> CancelOrder()
+        var order = Orders[orderId];
+
+        var response =
+            await order.Ask<SalesOrder.Responses.ConfirmOrderResponse>(new SalesOrder.Commands.ConfirmOrder());
+
+        if (!response.Success)
         {
-            Console.WriteLine("What order do you want to cancel?");
-            var orderId = Console.ReadLine() ?? "";
-            
-            if (!Orders.ContainsKey(orderId))
+            foreach (var error in response.Errors)
             {
-                Console.WriteLine($"There is not order with id {orderId}");
+                Console.WriteLine(error);
+            }
+        }
+        else
+        {
+            Console.WriteLine("Successfully confirmed the order");
+        }
 
-                return NextStep.Continue;
-            }
-            
-            var order = Orders[orderId];
+        return NextStep.Continue;
+    }
 
-            var response =
-                await order.Ask<SalesOrder.Responses.CancelOrderResponse>(new SalesOrder.Commands.CancelOrder());
-            
-            if (!response.Success)
-            {
-                foreach (var error in response.Errors)
-                {
-                    Console.WriteLine(error);
-                }
-            }
-            else
-            {
-                Console.WriteLine("Successfully cancelled the order");
-            }
+    private static async Task<NextStep> CancelOrder()
+    {
+        Console.WriteLine("What order do you want to cancel?");
+        var orderId = Console.ReadLine() ?? "";
+
+        if (!Orders.ContainsKey(orderId))
+        {
+            Console.WriteLine($"There is not order with id {orderId}");
 
             return NextStep.Continue;
         }
-        
-        private enum NextStep
+
+        var order = Orders[orderId];
+
+        var response =
+            await order.Ask<SalesOrder.Responses.CancelOrderResponse>(new SalesOrder.Commands.CancelOrder());
+
+        if (!response.Success)
         {
-            Continue,
-            Exit
+            foreach (var error in response.Errors)
+            {
+                Console.WriteLine(error);
+            }
         }
+        else
+        {
+            Console.WriteLine("Successfully cancelled the order");
+        }
+
+        return NextStep.Continue;
+    }
+
+    private enum NextStep
+    {
+        Continue,
+        Exit
     }
 }
