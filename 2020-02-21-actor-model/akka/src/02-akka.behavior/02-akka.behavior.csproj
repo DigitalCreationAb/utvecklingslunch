@@ -11,4 +11,13 @@
     <PackageReference Include="Akka" Version="1.5.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="SalesOrder.New.cs">
+      <DependentUpon>SalesOrder.cs</DependentUpon>
+    </Compile>
+    <Compile Update="SalesOrder.Placed.cs">
+      <DependentUpon>SalesOrder.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
 </Project>
